@@ -139,6 +139,15 @@ final class AppState: ObservableObject {
         }
     }
 
+    func setAlias(_ alias: String, for account: Account) {
+        do {
+            try store.setAlias(alias, for: account.directoryName)
+            reload(animated: true)
+        } catch {
+            generalError = RawErrorText.string(error)
+        }
+    }
+
     private func syncSharedCodexData(enabled: Bool, previous: Bool, rollbackOnFailure: Bool) {
         shareCodexDataTask?.cancel()
         shareCodexDataBusy = true
@@ -474,7 +483,7 @@ final class AppState: ObservableObject {
 
         let status = shim.currentStatus()
         shimStatus = status
-        guard !status.pathPrecedenceOK else {
+        guard !status.pathPrecedenceOK || status.shimNeedsUpdate else {
             shimError = nil
             return
         }

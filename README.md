@@ -17,6 +17,7 @@ macOS 状态栏里的 Codex 账号切换工具。
 
 - 多账号登录和移除。
 - 一键切换当前账号。
+- 支持账号别名和 `codex @alias`。
 - 自动接管现有 `~/.codex/auth.json`。
 - 显示每个账号的用量和重置时间。
 - 账号按当前账号、剩余额度排序。
@@ -40,12 +41,51 @@ Codex Accounts 不修改 Codex App 本体。
 
 切换账号的含义是：下一次启动 `codex` 时使用哪个 `CODEX_HOME`。
 
+## 指定账号启动
+
+默认使用当前账号：
+
+```bash
+codex
+```
+
+指定账号：
+
+```bash
+codex @ash
+```
+
+查看账号：
+
+```bash
+codex @
+```
+
+固定当前 shell：
+
+```bash
+export CODEX_ACCOUNT=ash
+codex
+```
+
+传给 Codex 的参数会原样保留：
+
+```bash
+codex @ash resume 019e2687-3131-7611-9fe6-42492e52c32a
+```
+
 ## 数据位置
 
 账号数据保存在：
 
 ```text
 ~/.codex.accounts/
+```
+
+账号别名索引：
+
+```text
+~/.codex.accounts/accounts.tsv
 ```
 
 每个账号都有独立的 `CODEX_HOME`：

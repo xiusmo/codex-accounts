@@ -3,11 +3,17 @@ import Foundation
 enum AccountStoreError: Error, LocalizedError {
     case noAuthJson
     case directoryConflict(String)
+    case accountNotFound(String)
+    case invalidAlias(String)
+    case duplicateAlias(String)
 
     var errorDescription: String? {
         switch self {
         case .noAuthJson: return "auth.json not found in account directory"
         case .directoryConflict(let name): return "Account directory '\(name)' already exists."
+        case .accountNotFound(let name): return "Account not found: \(name)"
+        case .invalidAlias(let alias): return "Invalid account alias: \(alias)"
+        case .duplicateAlias(let alias): return "Duplicate account alias: \(alias)"
         }
     }
 }
@@ -22,8 +28,27 @@ enum AccountStoreError: Error, LocalizedError {
 ///   └── work@company.com/
 ///       └── auth.json
 final class AccountStore {
+    private struct LoadedAccount {
+        let directoryName: String
+        let email: String?
+        let planType: String?
+        let chatgptAccountId: String?
+        let isActive: Bool
+        let homeDirectory: URL
+        let accessTokenExpired: Bool
+
+        var displayName: String { email ?? directoryName }
+        var maskedDisplayName: String { EmailPrivacy.masked(email ?? directoryName) }
+    }
+
     let baseURL: URL
     private let fm = FileManager.default
+    private let aliasCandidates = [
+        "ash", "bay", "cyan", "dew", "elm", "fox", "gold", "ivy", "jet", "mint",
+        "nova", "oak", "rain", "sage", "sky", "sun", "teal", "wave", "zen",
+        "ace", "arc", "bee", "bit", "dot", "fig", "ink", "map", "orb", "pod",
+        "ray", "sea", "tap", "tea", "way", "zip"
+    ]
 
     init(baseURL: URL? = nil) {
         if let base = baseURL {
@@ -35,6 +60,7 @@ final class AccountStore {
     }
 
     var activeFileURL: URL { baseURL.appendingPathComponent("active") }
+    var aliasIndexURL: URL { baseURL.appendingPathComponent("accounts.tsv") }
 
     /// Ensure the base directory exists. Safe to call repeatedly.
     func ensureBaseDirectory() throws {
@@ -63,13 +89,14 @@ final class AccountStore {
 
     /// Scan the base directory and produce Account values for every subdirectory
     /// containing an auth.json. Accounts are sorted: active first, then by display name.
+    /// Missing aliases are generated from short neutral words and persisted for the shim.
     func loadAll() throws -> [Account] {
         try ensureBaseDirectory()
         let activeName = readActiveName()
         let entries = try fm.contentsOfDirectory(at: baseURL,
                                                  includingPropertiesForKeys: [.isDirectoryKey],
                                                  options: [.skipsHiddenFiles])
-        var accounts: [Account] = []
+        var loaded: [LoadedAccount] = []
         for entry in entries {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: entry.path, isDirectory: &isDir), isDir.boolValue else { continue }
@@ -83,7 +110,7 @@ final class AccountStore {
                       let exp = JWT.parseExpiration(token) else { return false }
                 return exp < Date()
             }()
-            accounts.append(Account(
+            loaded.append(LoadedAccount(
                 directoryName: dirName,
                 email: claims?.email,
                 planType: claims?.chatgptPlanType,
@@ -93,10 +120,53 @@ final class AccountStore {
                 accessTokenExpired: expired
             ))
         }
+        let aliases = try reconcileAliases(for: loaded)
+        let accounts = loaded.map { row in
+            Account(
+                directoryName: row.directoryName,
+                alias: aliases[row.directoryName] ?? row.directoryName,
+                email: row.email,
+                planType: row.planType,
+                chatgptAccountId: row.chatgptAccountId,
+                isActive: row.isActive,
+                homeDirectory: row.homeDirectory,
+                accessTokenExpired: row.accessTokenExpired
+            )
+        }
         return accounts.sorted { a, b in
             if a.isActive != b.isActive { return a.isActive }
             return a.displayName.localizedCaseInsensitiveCompare(b.displayName) == .orderedAscending
         }
+    }
+
+    func setAlias(_ rawAlias: String, for directoryName: String) throws {
+        try ensureBaseDirectory()
+        guard let alias = normalizedAlias(rawAlias) else {
+            throw AccountStoreError.invalidAlias(rawAlias)
+        }
+
+        let accounts = try loadAll()
+        guard accounts.contains(where: { $0.directoryName == directoryName }) else {
+            throw AccountStoreError.accountNotFound(directoryName)
+        }
+        if accounts.contains(where: { $0.directoryName != directoryName && $0.alias.lowercased() == alias }) {
+            throw AccountStoreError.duplicateAlias(alias)
+        }
+
+        let rewritten = accounts.map { account in
+            LoadedAccount(
+                directoryName: account.directoryName,
+                email: account.email,
+                planType: account.planType,
+                chatgptAccountId: account.chatgptAccountId,
+                isActive: account.isActive,
+                homeDirectory: account.homeDirectory,
+                accessTokenExpired: account.accessTokenExpired
+            )
+        }
+        var aliases = Dictionary(uniqueKeysWithValues: accounts.map { ($0.directoryName, $0.alias) })
+        aliases[directoryName] = alias
+        try writeAliasIndex(rows: rewritten, aliases: aliases)
     }
 
     func discoverCodexImportCandidates(managedAccounts: [Account]) -> [CodexImportCandidate] {
@@ -176,6 +246,97 @@ final class AccountStore {
     }
 
     // MARK: - private
+
+    private func reconcileAliases(for rows: [LoadedAccount]) throws -> [String: String] {
+        var aliases: [String: String] = [:]
+        var used = Set<String>()
+        var didChange = false
+        let existing = readAliasIndex()
+        let validDirectories = Set(rows.map(\.directoryName))
+
+        for row in rows {
+            guard let raw = existing[row.directoryName],
+                  let alias = normalizedAlias(raw),
+                  !used.contains(alias) else {
+                didChange = true
+                continue
+            }
+            aliases[row.directoryName] = alias
+            used.insert(alias)
+            if raw != alias { didChange = true }
+        }
+
+        for row in rows where aliases[row.directoryName] == nil {
+            let alias = nextAlias(used: &used)
+            aliases[row.directoryName] = alias
+            didChange = true
+        }
+
+        if existing.keys.contains(where: { !validDirectories.contains($0) }) {
+            didChange = true
+        }
+
+        if didChange {
+            try writeAliasIndex(rows: rows, aliases: aliases)
+        }
+        return aliases
+    }
+
+    private func readAliasIndex() -> [String: String] {
+        guard let raw = try? String(contentsOf: aliasIndexURL, encoding: .utf8) else {
+            return [:]
+        }
+
+        var aliases: [String: String] = [:]
+        for line in raw.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("#") { continue }
+            let parts = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard parts.count >= 2 else { continue }
+            let alias = String(parts[0])
+            let directoryName = String(parts[1])
+            guard !alias.isEmpty, !directoryName.isEmpty else { continue }
+            aliases[directoryName] = alias
+        }
+        return aliases
+    }
+
+    private func writeAliasIndex(rows: [LoadedAccount], aliases: [String: String]) throws {
+        let sortedRows = rows.sorted {
+            (aliases[$0.directoryName] ?? "").localizedCaseInsensitiveCompare(
+                aliases[$1.directoryName] ?? ""
+            ) == .orderedAscending
+        }
+        var lines = ["# alias\tdirectory\tdisplay"]
+        for row in sortedRows {
+            guard let alias = aliases[row.directoryName] else { continue }
+            lines.append("\(alias)\t\(row.directoryName)\t\(row.maskedDisplayName)")
+        }
+        let contents = lines.joined(separator: "\n") + "\n"
+        try contents.write(to: aliasIndexURL, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: aliasIndexURL.path)
+    }
+
+    private func normalizedAlias(_ raw: String) -> String? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard (2...12).contains(value.count) else { return nil }
+        guard let first = value.first, first != "-", first != "_" else { return nil }
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
+        guard value.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
+        return value
+    }
+
+    private func nextAlias(used: inout Set<String>) -> String {
+        var suffix = 1
+        while true {
+            for word in aliasCandidates {
+                let candidate = suffix == 1 ? word : "\(word)\(suffix)"
+                if used.insert(candidate).inserted {
+                    return candidate
+                }
+            }
+            suffix += 1
+        }
+    }
 
     private func readAuth(at url: URL) throws -> AuthDotJson {
         let data = try Data(contentsOf: url)

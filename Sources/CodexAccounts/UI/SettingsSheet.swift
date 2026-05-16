@@ -5,6 +5,7 @@ struct SettingsPane: View {
     let onBack: () -> Void
     @State private var customRealPath: String = ""
     @State private var showCustomPath = false
+    @State private var aliasDrafts: [String: String] = [:]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,6 +19,10 @@ struct SettingsPane: View {
         .onAppear {
             state.refreshShimStatus()
             state.refreshLaunchAtLoginStatus()
+            syncAliasDrafts()
+        }
+        .onChange(of: state.accounts) { _ in
+            syncAliasDrafts()
         }
     }
 
@@ -45,6 +50,16 @@ struct SettingsPane: View {
 
             Divider()
 
+            settingsSection("账号别名") {
+                aliasBlock
+            }
+
+            if let error = state.generalError {
+                settingsErrorBlock(error)
+            }
+
+            Divider()
+
             settingsSection("codex 命令") {
                 if let status = state.shimStatus {
                     shimBlock(status)
@@ -56,6 +71,53 @@ struct SettingsPane: View {
             Divider()
 
             quitRow
+        }
+    }
+
+    private var aliasBlock: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            if state.accounts.isEmpty {
+                Text("暂无账号")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(state.accounts) { account in
+                    aliasRow(account)
+                }
+                Text("命令示例: codex @\(state.accounts.first?.alias ?? "ash")")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func aliasRow(_ account: Account) -> some View {
+        let draft = Binding<String>(
+            get: { aliasDrafts[account.directoryName] ?? account.alias },
+            set: { aliasDrafts[account.directoryName] = $0 }
+        )
+        let currentDraft = aliasDrafts[account.directoryName] ?? account.alias
+        let changed = currentDraft.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != account.alias
+
+        return HStack(alignment: .center, spacing: 8) {
+            Text(displayName(for: account))
+                .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            TextField("ash", text: draft)
+                .textFieldStyle(.roundedBorder)
+                .font(.caption.monospaced())
+                .frame(width: 84)
+                .onSubmit { saveAlias(account) }
+
+            Button("保存") {
+                saveAlias(account)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!changed)
         }
     }
 
@@ -141,6 +203,26 @@ struct SettingsPane: View {
         }
     }
 
+    private func displayName(for account: Account) -> String {
+        guard state.hideAccountEmail else { return account.displayName }
+        return EmailPrivacy.masked(account.email ?? account.displayName)
+    }
+
+    private func saveAlias(_ account: Account) {
+        let value = aliasDrafts[account.directoryName] ?? account.alias
+        state.setAlias(value, for: account)
+    }
+
+    private func syncAliasDrafts() {
+        var next = aliasDrafts
+        let validKeys = Set(state.accounts.map(\.directoryName))
+        next = next.filter { validKeys.contains($0.key) }
+        for account in state.accounts where next[account.directoryName] == nil {
+            next[account.directoryName] = account.alias
+        }
+        aliasDrafts = next
+    }
+
     @ViewBuilder
     private func shimBlock(_ status: ShimInstaller.Status) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -218,6 +300,7 @@ struct SettingsPane: View {
     }
 
     private func installLabel(_ status: ShimInstaller.Status) -> String {
+        if status.shimNeedsUpdate { return "更新" }
         switch status.installed {
             case .missing: return "安装"
             case .ours: return "重装"
@@ -269,6 +352,30 @@ struct SettingsPane: View {
                         .fill(Color.secondary.opacity(0.10))
                 )
         }
+    }
+
+    private func settingsErrorBlock(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(message)
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(4)
+                .textSelection(.enabled)
+            Spacer()
+            Button {
+                state.generalError = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.secondary.opacity(0.10))
+        )
     }
 
     private var quitRow: some View {

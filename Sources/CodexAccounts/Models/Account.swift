@@ -4,6 +4,8 @@ import Foundation
 struct Account: Identifiable, Equatable {
     /// Filesystem directory name under ~/.codex.accounts/. Sanitized email by default.
     let directoryName: String
+    /// Short user-facing handle used by the shim, for example `codex @ash`.
+    let alias: String
     /// Best-effort email pulled out of the id_token JWT.
     let email: String?
     /// Plan label ("pro", "plus", ...) pulled out of the id_token JWT.
@@ -20,6 +22,7 @@ struct Account: Identifiable, Equatable {
     var id: String { directoryName }
 
     var displayName: String { email ?? directoryName }
+    var commandAlias: String { "@\(alias)" }
 }
 
 /// A Codex auth.json found outside the managed account pool that can be imported.

@@ -45,6 +45,10 @@ struct AccountRow: View {
             .help(account.isActive ? "当前活跃账户" : "切换到此账户")
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(account.commandAlias)
+                    .font(.caption.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Text(displayName)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
