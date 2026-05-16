@@ -70,7 +70,7 @@ final class SharedCodexData {
         Item(relativePath: ".tmp/bundled-marketplaces", kind: .directory),
         Item(relativePath: ".tmp/marketplaces", kind: .directory),
         Item(relativePath: ".tmp/legacy-primary-runtime-skills", kind: .directory),
-        Item(relativePath: ".tmp/app-server-remote-plugin-sync-v1", kind: .directory)
+        Item(relativePath: ".tmp/app-server-remote-plugin-sync-v1", kind: .file)
     ]
     private let configItems: [Item] = [
         Item(relativePath: "config.toml", kind: .file),
@@ -133,7 +133,8 @@ final class SharedCodexData {
             guard itemExists(source) else { continue }
             let target = try url(sharedRoot, item.relativePath)
             try ensureParentDirectory(for: target)
-            try mergeMissing(from: source, into: target, kind: item.kind)
+            let sourceKind = actualKind(of: source) ?? item.kind
+            try mergeMissing(from: source, into: target, kind: sourceKind, relativePath: item.relativePath)
         }
     }
 
@@ -146,11 +147,12 @@ final class SharedCodexData {
                 continue
             }
 
-            if item.kind == .directory {
-                try ensureDirectory(targetURL)
-            } else {
-                try ensureParentDirectory(for: targetURL)
-            }
+            let sourceKind = isSymlink(linkURL) ? nil : actualKind(of: linkURL)
+            try prepareSharedTarget(
+                targetURL,
+                kind: sourceKind ?? item.kind,
+                relativePath: item.relativePath
+            )
 
             if itemExists(linkURL) {
                 try absorbExistingItem(
@@ -188,7 +190,8 @@ final class SharedCodexData {
             return
         }
 
-        try mergeMissing(from: source, into: target, kind: kind)
+        let sourceKind = actualKind(of: source) ?? kind
+        try mergeMissing(from: source, into: target, kind: sourceKind, relativePath: relativePath)
         try moveToBackup(source, accountName: accountName, relativePath: relativePath)
     }
 
@@ -204,7 +207,8 @@ final class SharedCodexData {
             guard itemExists(targetURL) else { continue }
 
             try ensureParentDirectory(for: linkURL)
-            if item.kind == .directory {
+            let targetKind = actualKind(of: targetURL) ?? item.kind
+            if targetKind == .directory {
                 try copyDirectoryContents(from: targetURL, to: linkURL)
             } else {
                 try fm.copyItem(at: targetURL, to: linkURL)
@@ -214,8 +218,26 @@ final class SharedCodexData {
 
     // MARK: - File movement
 
-    private func mergeMissing(from source: URL, into target: URL, kind: ItemKind) throws {
+    private func prepareSharedTarget(_ target: URL, kind: ItemKind, relativePath: String) throws {
+        if let targetKind = actualKind(of: target), targetKind != kind {
+            try moveSharedItemToBackup(target, relativePath: relativePath)
+        }
+
         switch kind {
+        case .file:
+            try ensureParentDirectory(for: target)
+        case .directory:
+            try ensureDirectory(target)
+        }
+    }
+
+    private func mergeMissing(from source: URL, into target: URL, kind: ItemKind, relativePath: String) throws {
+        let sourceKind = actualKind(of: source) ?? kind
+        if let targetKind = actualKind(of: target), targetKind != sourceKind {
+            try moveSharedItemToBackup(target, relativePath: relativePath)
+        }
+
+        switch sourceKind {
         case .file:
             if !itemExists(target) {
                 try ensureParentDirectory(for: target)
@@ -263,6 +285,16 @@ final class SharedCodexData {
         try fm.moveItem(at: source, to: backupURL)
     }
 
+    private func moveSharedItemToBackup(_ source: URL, relativePath: String) throws {
+        let stamp = Self.backupTimestamp()
+        let backupURL = backupRoot
+            .appendingPathComponent("_shared", isDirectory: true)
+            .appendingPathComponent(stamp, isDirectory: true)
+            .appendingPathComponent(relativePath)
+        try ensureParentDirectory(for: backupURL)
+        try fm.moveItem(at: source, to: backupURL)
+    }
+
     // MARK: - Path helpers
 
     private func url(_ root: URL, _ relativePath: String) throws -> URL {
@@ -297,6 +329,22 @@ final class SharedCodexData {
             return true
         }
         return isSymlink(url)
+    }
+
+    private func actualKind(of url: URL) -> ItemKind? {
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: url.path, isDirectory: &isDir) {
+            return isDir.boolValue ? .directory : .file
+        }
+
+        guard let destination = symlinkDestination(of: url, relativeTo: url.deletingLastPathComponent()) else {
+            return nil
+        }
+
+        if fm.fileExists(atPath: destination.path, isDirectory: &isDir) {
+            return isDir.boolValue ? .directory : .file
+        }
+        return nil
     }
 
     private func isSymlink(_ url: URL) -> Bool {
