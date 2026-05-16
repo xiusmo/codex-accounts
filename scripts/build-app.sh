@@ -11,7 +11,7 @@ cd "$ROOT"
 CONFIG="${CONFIG:-release}"
 APP_NAME="Codex Accounts"
 APP_BUNDLE_ID="${APP_BUNDLE_ID:-dev.codexaccounts.app}"
-APP_VERSION="${APP_VERSION:-0.1.0}"
+APP_VERSION="${APP_VERSION:-0.1.1}"
 
 echo "==> swift build -c $CONFIG"
 swift build -c "$CONFIG"
