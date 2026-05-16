@@ -366,8 +366,7 @@ struct PopoverRoot: View {
 
     private func remainingPercent(_ snapshot: WindowSnapshot?) -> Double? {
         guard let snapshot else { return nil }
-        guard snapshot.usedPercent.isFinite else { return nil }
-        return max(0, min(100, 100 - snapshot.usedPercent))
+        return snapshot.remainingPercent
     }
 }
 

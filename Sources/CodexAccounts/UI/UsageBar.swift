@@ -10,7 +10,7 @@ struct UsageBar: View {
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
                 .frame(width: 36, alignment: .leading)
-            BarView(percent: snapshot?.usedPercent ?? 0)
+            BarView(percent: snapshot?.remainingPercent ?? 0)
                 .frame(height: 5)
             Text(metaLabel)
                 .font(.caption.monospacedDigit())
@@ -22,7 +22,7 @@ struct UsageBar: View {
 
     private var metaLabel: String {
         guard let snapshot else { return "--%" }
-        let percent = "\(Int(snapshot.usedPercent.rounded()))%"
+        let percent = "\(Int(snapshot.remainingPercent.rounded()))%"
         guard let reset = snapshot.resetAt else { return percent }
         return "\(percent) · \(formatTimeUntil(reset))"
     }

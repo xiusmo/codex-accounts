@@ -55,4 +55,9 @@ struct WindowSnapshot: Equatable {
     let usedPercent: Double
     let resetAt: Date?
     let windowSeconds: Int?
+
+    var remainingPercent: Double {
+        guard usedPercent.isFinite else { return 0 }
+        return max(0, min(100, 100 - usedPercent))
+    }
 }
