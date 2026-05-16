@@ -2,9 +2,9 @@ import Foundation
 
 /// Shares selected account-neutral parts of multiple CODEX_HOME directories.
 ///
-/// Account credentials, sqlite state, logs, environment files, and installation
-/// identity intentionally stay per account. History/cache and config are separate
-/// toggles because config.toml changes Codex behavior.
+/// Account credentials, logs, environment files, installation identity, and
+/// process-local scratch space intentionally stay per account. History/state/cache
+/// and config are separate toggles because config changes Codex behavior.
 final class SharedCodexData {
     enum ShareError: Error, LocalizedError {
         case unsafeRelativePath(String)
@@ -34,21 +34,52 @@ final class SharedCodexData {
     private let fm = FileManager.default
 
     private let dataItems: [Item] = [
+        // Threads, resume metadata, goals, dynamic tools, jobs, and history.
         Item(relativePath: "sessions", kind: .directory),
         Item(relativePath: "archived_sessions", kind: .directory),
         Item(relativePath: "session_index.jsonl", kind: .file),
         Item(relativePath: "history.jsonl", kind: .file),
         Item(relativePath: "transcription-history.jsonl", kind: .file),
         Item(relativePath: "shell_snapshots", kind: .directory),
+        Item(relativePath: "state_5.sqlite", kind: .file),
+        Item(relativePath: "state_5.sqlite-wal", kind: .file),
+        Item(relativePath: "state_5.sqlite-shm", kind: .file),
+
+        // User-visible Codex state and installed capabilities.
+        Item(relativePath: "memories", kind: .directory),
+        Item(relativePath: "automations", kind: .directory),
+        Item(relativePath: "worktrees", kind: .directory),
+        Item(relativePath: "skills", kind: .directory),
+        Item(relativePath: "plugins", kind: .directory),
+        Item(relativePath: ".agents", kind: .directory),
+
+        // Account-neutral assets and caches.
+        Item(relativePath: "ambient-suggestions", kind: .directory),
         Item(relativePath: "generated_images", kind: .directory),
+        Item(relativePath: "pets", kind: .directory),
+        Item(relativePath: "avatars", kind: .directory),
+        Item(relativePath: "themes", kind: .directory),
+        Item(relativePath: "computer-use", kind: .directory),
         Item(relativePath: "cache", kind: .directory),
-        Item(relativePath: "plugins/cache", kind: .directory),
         Item(relativePath: "vendor_imports", kind: .directory),
         Item(relativePath: "models_cache.json", kind: .file),
-        Item(relativePath: "skills/.system", kind: .directory)
+        Item(relativePath: "version.json", kind: .file),
+        Item(relativePath: ".personality_migration", kind: .file),
+        Item(relativePath: ".tmp/plugins", kind: .directory),
+        Item(relativePath: ".tmp/plugins.sha", kind: .file),
+        Item(relativePath: ".tmp/bundled-marketplaces", kind: .directory),
+        Item(relativePath: ".tmp/marketplaces", kind: .directory),
+        Item(relativePath: ".tmp/legacy-primary-runtime-skills", kind: .directory),
+        Item(relativePath: ".tmp/app-server-remote-plugin-sync-v1", kind: .directory)
     ]
     private let configItems: [Item] = [
-        Item(relativePath: "config.toml", kind: .file)
+        Item(relativePath: "config.toml", kind: .file),
+        Item(relativePath: "AGENTS.md", kind: .file),
+        Item(relativePath: "hooks.json", kind: .file),
+        Item(relativePath: "keybindings.json", kind: .file),
+        Item(relativePath: "skills-role.toml", kind: .file),
+        Item(relativePath: "rules", kind: .directory),
+        Item(relativePath: "prompts", kind: .directory)
     ]
 
     init(accountsBaseURL: URL) {

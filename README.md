@@ -22,8 +22,8 @@ macOS 状态栏里的 Codex 账号切换工具。
 - 账号按当前账号、剩余额度排序。
 - access token 过期时自动刷新。
 - 可隐藏账号邮箱。
-- 可共享会话、历史、图片和插件缓存。
-- 可共享 `config.toml`。
+- 可共享会话、goal、状态、技能、插件和缓存。
+- 可共享 `config.toml`、`AGENTS.md`、规则和提示词。
 - 可安装/卸载 `codex` shim。
 - 检测到正在运行的 `codex` 进程时，可选择继续切换或结束后切换。
 
@@ -73,13 +73,44 @@ Codex Accounts 不修改 Codex App 本体。
 - `sessions`
 - `archived_sessions`
 - `history.jsonl`
+- `transcription-history.jsonl`
 - `session_index.jsonl`
+- `shell_snapshots`
+- `state_5.sqlite`
+- `state_5.sqlite-wal`
+- `state_5.sqlite-shm`
+- `memories`
+- `automations`
+- `worktrees`
+- `skills`
+- `plugins`
+- `.agents`
+- `ambient-suggestions`
 - `generated_images`
+- `pets`
+- `avatars`
+- `themes`
+- `computer-use`
 - `cache`
-- `plugins/cache`
+- `vendor_imports`
 - `models_cache.json`
-- `skills/.system`
+- `version.json`
+- `.personality_migration`
+- `.tmp/plugins`
+- `.tmp/bundled-marketplaces`
+- `.tmp/marketplaces`
+- `.tmp/legacy-primary-runtime-skills`
+- `.tmp/app-server-remote-plugin-sync-v1`
+
+可共享配置：
+
 - `config.toml`
+- `AGENTS.md`
+- `hooks.json`
+- `keybindings.json`
+- `skills-role.toml`
+- `rules`
+- `prompts`
 
 不会共享：
 
@@ -88,7 +119,14 @@ Codex Accounts 不修改 Codex App 本体。
 - token
 - 环境变量
 - 日志
-- 数据库状态
+- `logs_2.sqlite`
+- `log`
+- 安装身份
+- `installation_id`
+- `.codex-global-state.json`
+- `node_repl`
+- `tmp`
+- `.tmp` 中未列出的临时文件
 
 ## 构建
 

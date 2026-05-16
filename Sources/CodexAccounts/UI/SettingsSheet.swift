@@ -84,26 +84,26 @@ struct SettingsPane: View {
             .help("开启后保留邮箱前缀和域名，隐藏中间部分")
 
             settingToggle(
-                title: "共享记录和缓存",
-                detail: "会话、历史、图片、插件缓存",
+                title: "共享记录和状态",
+                detail: "会话、goal、缓存、插件、技能",
                 isOn: Binding(
                     get: { state.shareCodexData },
                     set: { state.setShareCodexData($0) }
                 ),
                 isDisabled: state.shareCodexDataBusy
             )
-            .help("共享 sessions、历史、生成图片、插件和模型缓存；不共享登录、配置、环境变量、日志和数据库")
+            .help("共享会话、goal、state_5.sqlite、memories、automations、worktrees、skills、plugins、图片和缓存；不共享登录、配置、环境变量和日志")
 
             settingToggle(
                 title: "共享配置",
-                detail: "config.toml",
+                detail: "config.toml、AGENTS、规则",
                 isOn: Binding(
                     get: { state.shareCodexConfig },
                     set: { state.setShareCodexConfig($0) }
                 ),
                 isDisabled: state.shareCodexConfigBusy
             )
-            .help("共享每个 CODEX_HOME 下的 config.toml；不共享 auth.json、环境变量、日志和数据库")
+            .help("共享 config.toml、AGENTS.md、hooks.json、keybindings.json、rules 和 prompts；不共享 auth.json、环境变量和日志")
 
             settingToggle(
                 title: "开机自启",
