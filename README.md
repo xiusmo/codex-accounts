@@ -8,9 +8,10 @@ macOS 状态栏里的 Codex 账号切换工具。
 
 ## 截图
 
-![账号列表](pics/accounts-list.png)
-
-![设置](pics/settings.png)
+<p>
+  <img src="pics/accounts-list.png" width="360" alt="账号列表">
+  <img src="pics/settings.png" width="360" alt="设置">
+</p>
 
 ## 特性
 
