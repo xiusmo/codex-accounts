@@ -24,6 +24,7 @@ final class AppState: ObservableObject {
     @Published var shareCodexDataBusy = false
     @Published var shareCodexConfig: Bool
     @Published var shareCodexConfigBusy = false
+    @Published var launchAtLogin: Bool
     @Published var codexImportCandidates: [CodexImportCandidate] = []
 
     let store: AccountStore
@@ -49,6 +50,7 @@ final class AppState: ObservableObject {
         self.hideAccountEmail = UserDefaults.standard.bool(forKey: Self.hideAccountEmailKey)
         self.shareCodexData = UserDefaults.standard.bool(forKey: Self.shareCodexDataKey)
         self.shareCodexConfig = UserDefaults.standard.bool(forKey: Self.shareCodexConfigKey)
+        self.launchAtLogin = LaunchAtLogin.isEnabled
         self.store = store
         self.usageClient = usageClient
         self.tokenRefresher = tokenRefresher
@@ -99,6 +101,10 @@ final class AppState: ObservableObject {
         shimStatus = shim.currentStatus()
     }
 
+    func refreshLaunchAtLoginStatus() {
+        launchAtLogin = LaunchAtLogin.isEnabled
+    }
+
     func setHideAccountEmail(_ hidden: Bool) {
         hideAccountEmail = hidden
         UserDefaults.standard.set(hidden, forKey: Self.hideAccountEmailKey)
@@ -118,6 +124,19 @@ final class AppState: ObservableObject {
         shareCodexConfig = enabled
         UserDefaults.standard.set(enabled, forKey: Self.shareCodexConfigKey)
         syncSharedCodexConfig(enabled: enabled, previous: previous, rollbackOnFailure: true)
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        guard enabled != launchAtLogin else { return }
+        let previous = launchAtLogin
+        launchAtLogin = enabled
+        do {
+            try LaunchAtLogin.setEnabled(enabled)
+            refreshLaunchAtLoginStatus()
+        } catch {
+            launchAtLogin = previous
+            generalError = RawErrorText.string(error)
+        }
     }
 
     private func syncSharedCodexData(enabled: Bool, previous: Bool, rollbackOnFailure: Bool) {

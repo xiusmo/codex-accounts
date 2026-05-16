@@ -15,7 +15,10 @@ struct SettingsPane: View {
                 .padding(.vertical, 12)
         }
         .fixedSize(horizontal: false, vertical: true)
-        .onAppear { state.refreshShimStatus() }
+        .onAppear {
+            state.refreshShimStatus()
+            state.refreshLaunchAtLoginStatus()
+        }
     }
 
     private var header: some View {
@@ -101,6 +104,16 @@ struct SettingsPane: View {
                 isDisabled: state.shareCodexConfigBusy
             )
             .help("共享每个 CODEX_HOME 下的 config.toml；不共享 auth.json、环境变量、日志和数据库")
+
+            settingToggle(
+                title: "开机自启",
+                detail: "登录 macOS 后自动启动",
+                isOn: Binding(
+                    get: { state.launchAtLogin },
+                    set: { state.setLaunchAtLogin($0) }
+                )
+            )
+            .help("使用 macOS 登录项；默认关闭")
         }
     }
 
