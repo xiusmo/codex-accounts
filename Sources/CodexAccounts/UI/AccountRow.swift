@@ -15,7 +15,6 @@ struct AccountRow: View {
                 removeConfirmRow
             } else {
                 normalRow
-                contentForState
             }
         }
         .padding(.vertical, 9)
@@ -33,35 +32,40 @@ struct AccountRow: View {
     }
 
     private var normalRow: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Button(action: onSwitch) {
                 Image(systemName: account.isActive ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(account.isActive ? Color.secondary.opacity(0.78) : Color.secondary)
-                    .frame(width: 18, height: 18)
+                    .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
             .disabled(account.isActive)
             .help(account.isActive ? "当前活跃账户" : "切换到此账户")
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(account.commandAlias)
-                    .font(.caption.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .layoutPriority(1)
-                planBadge
-                statusBadge
-                if account.isActive {
-                    smallBadge("当前")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(account.commandAlias)
+                        .font(.caption.monospaced().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Text(displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .layoutPriority(3)
+                    planBadge
+                    statusBadge
+                    if account.isActive {
+                        smallBadge("当前")
+                    }
                 }
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
+                contentForState
+            }
+            .layoutPriority(1)
 
             Button {
                 confirmingRemove = true
@@ -140,6 +144,8 @@ struct AccountRow: View {
         Text(text)
             .font(.caption2)
             .foregroundStyle(foreground)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
             .background(
@@ -156,13 +162,11 @@ struct AccountRow: View {
                 UsageBar(title: "5h", snapshot: nil)
                 UsageBar(title: "week", snapshot: nil)
             }
-            .padding(.leading, 28)
         case .loaded(_, let primary, let secondary):
             VStack(spacing: 6) {
                 UsageBar(title: "5h", snapshot: primary)
                 UsageBar(title: "week", snapshot: secondary)
             }
-            .padding(.leading, 28)
         case .tokenExpired(let raw):
             compactStatusLine(raw ?? "过期")
         case .authInvalid(let raw):
@@ -184,6 +188,5 @@ struct AccountRow: View {
                 .textSelection(.enabled)
             Spacer()
         }
-        .padding(.leading, 28)
     }
 }

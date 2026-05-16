@@ -14,11 +14,21 @@ struct PopoverRoot: View {
             }
         }
         .id(showingSettings ? "settings" : "accounts")
+        .frame(width: panelWidth)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             state.reload()
             Task { await state.refreshAllUsage() }
         }
+    }
+
+    private var panelWidth: CGFloat {
+        Layout.panelWidth(
+            accounts: state.accounts,
+            importCandidates: state.codexImportCandidates,
+            hideEmail: state.hideAccountEmail,
+            showingSettings: showingSettings
+        )
     }
 
     private var accountsView: some View {
@@ -377,6 +387,8 @@ private struct AccountUsageSortScore {
 
 private enum Layout {
     static let accountMoveAnimation = Animation.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.06)
+    static let minimumPanelWidth: CGFloat = 420
+    static let maximumPanelWidth: CGFloat = 540
     static let minAccountRegionHeight: CGFloat = 78
     static let minImportRegionHeight: CGFloat = 58
     static let minMessageRegionHeight: CGFloat = 44
@@ -385,6 +397,27 @@ private enum Layout {
     static let estimatedMessageHeight: CGFloat = 48
     static let contentVerticalPadding: CGFloat = 8
     static let maximumTallScreenContentHeight: CGFloat = 820
+
+    static func panelWidth(
+        accounts: [Account],
+        importCandidates: [CodexImportCandidate],
+        hideEmail: Bool,
+        showingSettings: Bool
+    ) -> CGFloat {
+        let visibleWidth = currentScreenVisibleWidth()
+        let screenMax = min(maximumPanelWidth, max(320, visibleWidth - 64))
+        let screenMin = min(minimumPanelWidth, screenMax)
+        let longestAccount = accounts
+            .map { accountHeaderLength($0, hideEmail: hideEmail) }
+            .max() ?? 0
+        let longestImport = importCandidates
+            .map { candidateDisplayName($0, hideEmail: hideEmail).count }
+            .max() ?? 0
+        let longest = max(longestAccount, longestImport)
+        let contentBased = 282 + CGFloat(longest) * 6.6
+        let target = showingSettings ? max(460, contentBased) : max(minimumPanelWidth, contentBased)
+        return max(screenMin, min(screenMax, target.rounded(.up)))
+    }
 
     static func maxContentRegionHeight(hasPendingBanner: Bool) -> CGFloat {
         let visibleHeight = currentScreenVisibleHeight()
@@ -396,12 +429,34 @@ private enum Layout {
         )
     }
 
+    private static func accountHeaderLength(_ account: Account, hideEmail: Bool) -> Int {
+        let display = hideEmail
+            ? EmailPrivacy.masked(account.email ?? account.displayName)
+            : account.displayName
+        let planLength = (account.planType ?? "").count
+        let activeLength = account.isActive ? 2 : 0
+        return account.commandAlias.count + display.count + planLength + activeLength
+    }
+
+    private static func candidateDisplayName(_ candidate: CodexImportCandidate, hideEmail: Bool) -> String {
+        guard hideEmail else { return candidate.displayName }
+        return EmailPrivacy.masked(candidate.email ?? candidate.displayName)
+    }
+
     private static func currentScreenVisibleHeight() -> CGFloat {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { screen in
             NSMouseInRect(mouse, screen.frame, false)
         } ?? NSScreen.main
         return screen?.visibleFrame.height ?? 800
+    }
+
+    private static func currentScreenVisibleWidth() -> CGFloat {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { screen in
+            NSMouseInRect(mouse, screen.frame, false)
+        } ?? NSScreen.main
+        return screen?.visibleFrame.width ?? 900
     }
 }
 

@@ -16,7 +16,6 @@ struct CodexAccountsApp: App {
         MenuBarExtra {
             PopoverRoot()
                 .environmentObject(state)
-                .frame(width: 380)
         } label: {
             Image(systemName: "key.horizontal.fill")
         }
