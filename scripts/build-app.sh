@@ -38,6 +38,25 @@ mkdir -p "$APP/Contents/Resources"
 cp "$BIN_DIR/CodexAccounts" "$APP/Contents/MacOS/CodexAccounts"
 if [ -d "$BIN_DIR/CodexAccounts_CodexAccounts.bundle" ]; then
     cp -R "$BIN_DIR/CodexAccounts_CodexAccounts.bundle" "$APP/Contents/MacOS/"
+    RESOURCE_BUNDLE="$APP/Contents/MacOS/CodexAccounts_CodexAccounts.bundle"
+    cat > "$RESOURCE_BUNDLE/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>$APP_BUNDLE_ID.resources</string>
+    <key>CFBundleName</key>
+    <string>CodexAccounts Resources</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$APP_VERSION</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>
+EOF
 fi
 
 cat > "$APP/Contents/Info.plist" <<EOF
@@ -73,8 +92,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-# Re-sign with ad-hoc signature so Gatekeeper doesn't kill it on launch
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# Re-sign with ad-hoc signature so Gatekeeper doesn't kill it on launch.
+codesign --force --deep --sign - "$APP" >/dev/null
 
 echo "==> Built: $APP"
 echo

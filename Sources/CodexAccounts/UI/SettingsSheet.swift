@@ -6,6 +6,7 @@ struct SettingsPane: View {
     @State private var customRealPath: String = ""
     @State private var showCustomPath = false
     @State private var aliasDrafts: [String: String] = [:]
+    @State private var aliasesExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,9 +51,7 @@ struct SettingsPane: View {
 
             Divider()
 
-            settingsSection("账号别名") {
-                aliasBlock
-            }
+            aliasSection
 
             if let error = state.generalError {
                 settingsErrorBlock(error)
@@ -89,6 +88,40 @@ struct SettingsPane: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var aliasSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    aliasesExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("账号别名")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(aliasSummary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: aliasesExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if aliasesExpanded {
+                aliasBlock
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    private var aliasSummary: String {
+        state.accounts.isEmpty ? "暂无账号" : "\(state.accounts.count) 个账号"
     }
 
     private func aliasRow(_ account: Account) -> some View {

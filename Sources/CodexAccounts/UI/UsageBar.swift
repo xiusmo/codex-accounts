@@ -16,7 +16,7 @@ struct UsageBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: 98, alignment: .leading)
+                .frame(width: 90, alignment: .trailing)
         }
     }
 

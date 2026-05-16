@@ -17,7 +17,6 @@ struct PopoverRoot: View {
         .frame(width: panelWidth)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
-            state.reload()
             Task { await state.refreshAllUsage() }
         }
     }
@@ -158,13 +157,29 @@ struct PopoverRoot: View {
             Text("Codex Accounts")
                 .font(.system(size: 13, weight: .semibold))
             Spacer()
+            if let label = refreshTimestampLabel {
+                Text(label)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(refreshTimestampHelp)
+            }
             Button {
                 Task { await state.refreshAllUsage() }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .opacity(state.usageRefreshInProgress ? 0 : 1)
+                    .overlay {
+                        if state.usageRefreshInProgress {
+                            ProgressView()
+                                .controlSize(.small)
+                                .scaleEffect(0.55)
+                        }
+                    }
             }
             .buttonStyle(.plain)
-            .help("刷新所有账户的用量")
+            .disabled(state.usageRefreshInProgress)
+            .help(state.usageRefreshInProgress ? "正在刷新用量" : "刷新所有账户的用量")
 
             Button {
                 showingSettings = true
@@ -176,6 +191,24 @@ struct PopoverRoot: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    private var refreshTimestampLabel: String? {
+        if state.usageRefreshInProgress { return "更新中" }
+        guard let date = state.lastSuccessfulUsageRefreshAt else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = Calendar.current.isDateInToday(date) ? "HH:mm" : "M/d HH:mm"
+        return "更新 \(formatter.string(from: date))"
+    }
+
+    private var refreshTimestampHelp: String {
+        if state.usageRefreshInProgress { return "正在刷新用量" }
+        guard let date = state.lastSuccessfulUsageRefreshAt else { return "暂无成功刷新" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "上次刷新成功：\(formatter.string(from: date))"
     }
 
     @ViewBuilder

@@ -32,7 +32,7 @@ struct AccountRow: View {
     }
 
     private var normalRow: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 6) {
             Button(action: onSwitch) {
                 Image(systemName: account.isActive ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16, weight: .medium))
@@ -72,7 +72,7 @@ struct AccountRow: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .semibold))
-                    .frame(width: 18, height: 18)
+                    .frame(width: 16, height: 18)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)

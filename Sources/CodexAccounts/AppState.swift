@@ -26,6 +26,8 @@ final class AppState: ObservableObject {
     @Published var shareCodexConfigBusy = false
     @Published var launchAtLogin: Bool
     @Published var codexImportCandidates: [CodexImportCandidate] = []
+    @Published var lastSuccessfulUsageRefreshAt: Date?
+    @Published var usageRefreshInProgress = false
 
     let store: AccountStore
     let usageClient: UsageClient
@@ -229,7 +231,10 @@ final class AppState: ObservableObject {
     // MARK: - Usage refresh (on popover open / manual refresh)
 
     func refreshAllUsage() async {
-        reload()
+        guard !usageRefreshInProgress else { return }
+        usageRefreshInProgress = true
+        defer { usageRefreshInProgress = false }
+
         let snapshot = accounts
         for acc in snapshot {
             if usage[acc.directoryName] == nil || usage[acc.directoryName] == .idle {
@@ -237,6 +242,7 @@ final class AppState: ObservableObject {
             }
         }
         await withTaskGroup(of: (String, UsageState).self) { group in
+            var hasSuccessfulUsage = false
             for acc in snapshot {
                 group.addTask { [usageClient, tokenRefresher] in
                     let result = await Self.fetchUsageRefreshingIfNeeded(
@@ -248,12 +254,17 @@ final class AppState: ObservableObject {
                 }
             }
             for await (key, value) in group {
+                if case .loaded = value {
+                    hasSuccessfulUsage = true
+                }
                 withAnimation(Self.accountMoveAnimation) {
                     usage[key] = value
                 }
             }
+            if hasSuccessfulUsage {
+                lastSuccessfulUsageRefreshAt = Date()
+            }
         }
-        reload(animated: true)
     }
 
     private nonisolated static func fetchUsageRefreshingIfNeeded(
