@@ -4,6 +4,7 @@ struct AccountRow: View {
     let account: Account
     let state: UsageState
     let hideEmail: Bool
+    let showSparkUsage: Bool
     let onSwitch: () -> Void
     let onRemove: () -> Void
 
@@ -106,7 +107,7 @@ struct AccountRow: View {
 
     private var displayPlan: String? {
         if let plan = account.planType { return plan }
-        if case let .loaded(plan, _, _) = state, let plan { return plan }
+        if case let .loaded(plan, _, _, _) = state, let plan { return plan }
         return nil
     }
 
@@ -162,10 +163,20 @@ struct AccountRow: View {
                 UsageBar(title: "5h", snapshot: nil)
                 UsageBar(title: "week", snapshot: nil)
             }
-        case .loaded(_, let primary, let secondary):
+        case .loaded(_, let primary, let secondary, let additional):
             VStack(spacing: 6) {
                 UsageBar(title: "5h", snapshot: primary)
                 UsageBar(title: "week", snapshot: secondary)
+                if showSparkUsage {
+                    ForEach(Array(sparkLimits(from: additional).enumerated()), id: \.offset) { _, limit in
+                        if limit.primary != nil {
+                            UsageBar(title: "\(limit.displayName) 5h", snapshot: limit.primary)
+                        }
+                        if limit.secondary != nil {
+                            UsageBar(title: "\(limit.displayName) week", snapshot: limit.secondary)
+                        }
+                    }
+                }
             }
         case .tokenExpired(let raw):
             compactStatusLine(raw ?? "过期")
@@ -187,6 +198,12 @@ struct AccountRow: View {
                 .truncationMode(.tail)
                 .textSelection(.enabled)
             Spacer()
+        }
+    }
+
+    private func sparkLimits(from additional: [AdditionalUsageSnapshot]) -> [AdditionalUsageSnapshot] {
+        additional.filter { limit in
+            limit.isSparkLimit && (limit.primary != nil || limit.secondary != nil)
         }
     }
 }

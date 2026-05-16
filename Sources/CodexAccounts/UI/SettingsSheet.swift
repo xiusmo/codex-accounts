@@ -170,13 +170,21 @@ struct SettingsPane: View {
         VStack(alignment: .leading, spacing: 8) {
             settingToggle(
                 title: "隐藏账号邮箱",
-                detail: "保留前缀和域名",
                 isOn: Binding(
                     get: { state.hideAccountEmail },
                     set: { state.setHideAccountEmail($0) }
                 )
             )
             .help("开启后保留邮箱前缀和域名，隐藏中间部分")
+
+            settingToggle(
+                title: "显示 Spark 额度",
+                isOn: Binding(
+                    get: { state.showSparkUsage },
+                    set: { state.setShowSparkUsage($0) }
+                )
+            )
+            .help("开启后，如果 ChatGPT 用量接口返回 Spark 或 codex_other 附加限额，会在账号列表中显示")
 
             settingToggle(
                 title: "共享记录和状态",
@@ -202,7 +210,6 @@ struct SettingsPane: View {
 
             settingToggle(
                 title: "开机自启",
-                detail: "登录 macOS 后自动启动",
                 isOn: Binding(
                     get: { state.launchAtLogin },
                     set: { state.setLaunchAtLogin($0) }
@@ -214,7 +221,7 @@ struct SettingsPane: View {
 
     private func settingToggle(
         title: String,
-        detail: String,
+        detail: String? = nil,
         isOn: Binding<Bool>,
         isDisabled: Bool = false
     ) -> some View {
@@ -222,10 +229,12 @@ struct SettingsPane: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if let detail {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer()
             Toggle("", isOn: isOn)

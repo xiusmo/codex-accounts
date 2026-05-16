@@ -52,7 +52,15 @@ final class UsageClient {
     private func makeLoaded(payload: UsagePayload) -> UsageState {
         let primary = payload.rateLimit?.primaryWindow.map(snapshot(from:))
         let secondary = payload.rateLimit?.secondaryWindow.map(snapshot(from:))
-        return .loaded(plan: payload.planType, primary: primary, secondary: secondary)
+        let additional = payload.additionalRateLimits?.map { details in
+            AdditionalUsageSnapshot(
+                limitName: details.limitName,
+                meteredFeature: details.meteredFeature,
+                primary: details.rateLimit?.primaryWindow.map(snapshot(from:)),
+                secondary: details.rateLimit?.secondaryWindow.map(snapshot(from:))
+            )
+        } ?? []
+        return .loaded(plan: payload.planType, primary: primary, secondary: secondary, additional: additional)
     }
 
     private func snapshot(from window: RateLimitWindow) -> WindowSnapshot {

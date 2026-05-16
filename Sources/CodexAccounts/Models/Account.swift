@@ -41,7 +41,7 @@ struct CodexImportCandidate: Identifiable, Equatable {
 enum UsageState: Equatable {
     case idle
     case loading
-    case loaded(plan: String?, primary: WindowSnapshot?, secondary: WindowSnapshot?)
+    case loaded(plan: String?, primary: WindowSnapshot?, secondary: WindowSnapshot?, additional: [AdditionalUsageSnapshot])
     /// Token refresh failed, or the backend rejected the current auth.
     case tokenExpired(String?)
     /// Refresh token was rejected as invalid/reused/revoked.
@@ -59,5 +59,27 @@ struct WindowSnapshot: Equatable {
     var remainingPercent: Double {
         guard usedPercent.isFinite else { return 0 }
         return max(0, min(100, 100 - usedPercent))
+    }
+}
+
+struct AdditionalUsageSnapshot: Equatable {
+    let limitName: String?
+    let meteredFeature: String?
+    let primary: WindowSnapshot?
+    let secondary: WindowSnapshot?
+
+    var isSparkLimit: Bool {
+        let identifiers = [limitName, meteredFeature]
+            .compactMap { $0?.lowercased() }
+        return identifiers.contains { value in
+            value.contains("spark") || value == "codex_other"
+        }
+    }
+
+    var displayName: String {
+        guard let raw = limitName ?? meteredFeature else { return "Spark" }
+        if raw.caseInsensitiveCompare("codex_other") == .orderedSame { return "Spark" }
+        if raw.localizedCaseInsensitiveContains("spark") { return "Spark" }
+        return raw
     }
 }

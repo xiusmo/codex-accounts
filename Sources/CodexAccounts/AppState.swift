@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class AppState: ObservableObject {
     private static let hideAccountEmailKey = "hideAccountEmail"
+    private static let showSparkUsageKey = "showSparkUsage"
     private static let shareCodexDataKey = "shareCodexData"
     private static let shareCodexConfigKey = "shareCodexConfig"
     private static let disableAutoTakeoverKey = "disableAutoTakeover"
@@ -20,6 +21,7 @@ final class AppState: ObservableObject {
     @Published var pendingSwitch: Account?
     @Published var confirmingTerminateRunningCodex = false
     @Published var hideAccountEmail: Bool
+    @Published var showSparkUsage: Bool
     @Published var shareCodexData: Bool
     @Published var shareCodexDataBusy = false
     @Published var shareCodexConfig: Bool
@@ -50,6 +52,7 @@ final class AppState: ObservableObject {
          logout: OAuthLogout = OAuthLogout(),
          sharedData: SharedCodexData? = nil) {
         self.hideAccountEmail = UserDefaults.standard.bool(forKey: Self.hideAccountEmailKey)
+        self.showSparkUsage = UserDefaults.standard.object(forKey: Self.showSparkUsageKey) as? Bool ?? true
         self.shareCodexData = UserDefaults.standard.bool(forKey: Self.shareCodexDataKey)
         self.shareCodexConfig = UserDefaults.standard.bool(forKey: Self.shareCodexConfigKey)
         self.launchAtLogin = LaunchAtLogin.isEnabled
@@ -110,6 +113,11 @@ final class AppState: ObservableObject {
     func setHideAccountEmail(_ hidden: Bool) {
         hideAccountEmail = hidden
         UserDefaults.standard.set(hidden, forKey: Self.hideAccountEmailKey)
+    }
+
+    func setShowSparkUsage(_ enabled: Bool) {
+        showSparkUsage = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.showSparkUsageKey)
     }
 
     func setShareCodexData(_ enabled: Bool) {

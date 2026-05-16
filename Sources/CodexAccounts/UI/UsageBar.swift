@@ -9,7 +9,7 @@ struct UsageBar: View {
             Text(title)
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
-                .frame(width: 36, alignment: .leading)
+                .frame(width: titleWidth, alignment: .leading)
             BarView(percent: snapshot?.remainingPercent ?? 0)
                 .frame(height: 5)
             Text(metaLabel)
@@ -25,6 +25,10 @@ struct UsageBar: View {
         let percent = "\(Int(snapshot.remainingPercent.rounded()))%"
         guard let reset = snapshot.resetAt else { return percent }
         return "\(percent) · \(formatTimeUntil(reset))"
+    }
+
+    private var titleWidth: CGFloat {
+        title.count > 4 ? 82 : 36
     }
 }
 

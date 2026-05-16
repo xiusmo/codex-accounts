@@ -6,11 +6,25 @@ struct UsagePayload: Codable {
     var planType: String?
     var rateLimit: RateLimitDetails?
     var credits: CreditDetails?
+    var additionalRateLimits: [AdditionalRateLimitDetails]?
 
     enum CodingKeys: String, CodingKey {
         case planType = "plan_type"
         case rateLimit = "rate_limit"
         case credits
+        case additionalRateLimits = "additional_rate_limits"
+    }
+}
+
+struct AdditionalRateLimitDetails: Codable {
+    var limitName: String?
+    var meteredFeature: String?
+    var rateLimit: RateLimitDetails?
+
+    enum CodingKeys: String, CodingKey {
+        case limitName = "limit_name"
+        case meteredFeature = "metered_feature"
+        case rateLimit = "rate_limit"
     }
 }
 

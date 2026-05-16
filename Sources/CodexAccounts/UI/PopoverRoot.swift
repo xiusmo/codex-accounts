@@ -230,6 +230,7 @@ struct PopoverRoot: View {
                             account: account,
                             state: state.usage[account.directoryName] ?? .idle,
                             hideEmail: state.hideAccountEmail,
+                            showSparkUsage: state.showSparkUsage,
                             onSwitch: { state.requestSwitch(to: account) },
                             onRemove: { state.removeAccount(account) }
                         )
@@ -378,13 +379,18 @@ struct PopoverRoot: View {
     }
 
     private func usageSortScore(for account: Account) -> AccountUsageSortScore {
-        guard case let .loaded(_, primary, secondary) = state.usage[account.directoryName] else {
+        guard case let .loaded(_, primary, secondary, additional) = state.usage[account.directoryName] else {
             return .unknown
         }
 
         let primaryRemaining = remainingPercent(primary)
         let secondaryRemaining = remainingPercent(secondary)
-        let known = [primaryRemaining, secondaryRemaining].compactMap { $0 }
+        let sparkRemaining = state.showSparkUsage
+            ? additional
+                .filter { $0.isSparkLimit }
+                .flatMap { [remainingPercent($0.primary), remainingPercent($0.secondary)] }
+            : []
+        let known = ([primaryRemaining, secondaryRemaining] + sparkRemaining).compactMap { $0 }
         guard !known.isEmpty else {
             return .unknown
         }
