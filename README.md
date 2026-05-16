@@ -1,0 +1,122 @@
+# Codex Accounts
+
+macOS 状态栏里的 Codex 账号切换工具。
+
+它管理多个 Codex CLI 登录环境，让下一次启动的 `codex` 使用你选中的账号。
+
+非 OpenAI 官方项目。
+
+## 截图
+
+![账号列表](pics/accounts-list.png)
+
+![设置](pics/settings.png)
+
+## 特性
+
+- 多账号登录和移除。
+- 一键切换当前账号。
+- 自动接管现有 `~/.codex/auth.json`。
+- 显示每个账号的用量和重置时间。
+- 账号按当前账号、剩余额度排序。
+- access token 过期时自动刷新。
+- 可隐藏账号邮箱。
+- 可共享会话、历史、图片和插件缓存。
+- 可共享 `config.toml`。
+- 可安装/卸载 `codex` shim。
+- 检测到正在运行的 `codex` 进程时，可选择继续切换或结束后切换。
+
+## 不影响 Codex App
+
+Codex Accounts 不修改 Codex App 本体。
+
+它只管理命令行 `codex` 的启动环境：
+
+- 不改 Codex App 的应用包。
+- 不注入 Codex App 进程。
+- 不影响已经运行的 `codex` 进程。
+- 只影响通过被接管入口启动的新 `codex` CLI 进程。
+
+切换账号的含义是：下一次启动 `codex` 时使用哪个 `CODEX_HOME`。
+
+## 数据位置
+
+账号数据保存在：
+
+```text
+~/.codex.accounts/
+```
+
+每个账号都有独立的 `CODEX_HOME`：
+
+```text
+~/.codex.accounts/<account>/
+```
+
+共享数据保存在：
+
+```text
+~/.codex.accounts/.shared-data/
+```
+
+本地备份保存在：
+
+```text
+~/.codex.accounts/.local-backups/
+```
+
+## 共享范围
+
+可共享：
+
+- `sessions`
+- `archived_sessions`
+- `history.jsonl`
+- `session_index.jsonl`
+- `generated_images`
+- `cache`
+- `plugins/cache`
+- `models_cache.json`
+- `skills/.system`
+- `config.toml`
+
+不会共享：
+
+- `auth.json`
+- API key
+- token
+- 环境变量
+- 日志
+- 数据库状态
+
+## 构建
+
+```bash
+swift build
+```
+
+构建 macOS app：
+
+```bash
+scripts/build-app.sh
+```
+
+运行：
+
+```bash
+open "dist/Codex Accounts.app"
+```
+
+## 要求
+
+- macOS 13+
+- Swift 5.9+
+- 已安装 Codex CLI
+
+## 说明
+
+Codex Accounts 使用 `CODEX_HOME` 隔离账号。
+
+安装 shim 后，`codex` 启动时会读取当前选中的账号目录，并把它设置为 `CODEX_HOME`。
+
+卸载 shim 后，`codex` 会恢复到原来的入口。
