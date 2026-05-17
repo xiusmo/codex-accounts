@@ -17,7 +17,7 @@ struct PopoverRoot: View {
         .frame(width: panelWidth)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
-            Task { await state.refreshAllUsage() }
+            Task { await state.refreshAllUsageIfStale() }
         }
     }
 

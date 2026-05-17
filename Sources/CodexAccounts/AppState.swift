@@ -9,6 +9,7 @@ final class AppState: ObservableObject {
     private static let shareCodexConfigKey = "shareCodexConfig"
     private static let disableAutoTakeoverKey = "disableAutoTakeover"
     private static let accountMoveAnimation = Animation.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.06)
+    private static let usageRefreshCooldown: TimeInterval = 60
 
     @Published var accounts: [Account] = []
     @Published var usage: [String: UsageState] = [:]
@@ -43,6 +44,7 @@ final class AppState: ObservableObject {
     private var shareCodexConfigTask: Task<Void, Never>?
     private var loginGeneration = 0
     private var autoTakeoverAttempted = false
+    private var lastUsageRefreshStartedAt: Date?
 
     init(store: AccountStore = AccountStore(),
          usageClient: UsageClient = UsageClient(),
@@ -238,8 +240,21 @@ final class AppState: ObservableObject {
 
     // MARK: - Usage refresh (on popover open / manual refresh)
 
+    func refreshAllUsageIfStale() async {
+        guard !usageRefreshInProgress else { return }
+
+        let now = Date()
+        if let lastUsageRefreshStartedAt,
+           now.timeIntervalSince(lastUsageRefreshStartedAt) < Self.usageRefreshCooldown {
+            return
+        }
+
+        await refreshAllUsage()
+    }
+
     func refreshAllUsage() async {
         guard !usageRefreshInProgress else { return }
+        lastUsageRefreshStartedAt = Date()
         usageRefreshInProgress = true
         defer { usageRefreshInProgress = false }
 
