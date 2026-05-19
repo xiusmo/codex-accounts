@@ -5,6 +5,8 @@ struct PopoverRoot: View {
     @EnvironmentObject var state: AppState
     @State private var showingSettings = false
 
+    private var l10n: L10n { L10n(language: state.appLanguage) }
+
     var body: some View {
         Group {
             if showingSettings {
@@ -85,8 +87,8 @@ struct PopoverRoot: View {
                 pendingSwitchRow
             }
             Text(state.confirmingTerminateRunningCodex
-                 ? "结束后会立即切换账号。"
-                 : "已运行进程继续使用原账号，新启动 codex 使用新账号。")
+                 ? l10n.text(.pendingSwitchAfterTerminate)
+                 : l10n.text(.pendingSwitchKeepsRunning))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -98,21 +100,21 @@ struct PopoverRoot: View {
 
     private var pendingSwitchRow: some View {
         HStack(alignment: .center, spacing: 7) {
-            Text("codex 正在运行")
+            Text(l10n.text(.codexRunning))
                 .font(.system(size: 12, weight: .semibold))
             processCountBadge
             Spacer()
-            Button("取消") {
+            Button(l10n.text(.cancel)) {
                 state.cancelPendingSwitch()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            Button("我很懒") {
+            Button(l10n.text(.lazyTerminate)) {
                 state.requestTerminateRunningCodex()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            Button("切换") {
+            Button(l10n.text(.switch)) {
                 state.confirmPendingSwitch()
             }
             .buttonStyle(.bordered)
@@ -122,16 +124,16 @@ struct PopoverRoot: View {
 
     private var terminateConfirmRow: some View {
         HStack(alignment: .center, spacing: 7) {
-            Text("结束 codex?")
+            Text(l10n.text(.terminateCodexPrompt))
                 .font(.system(size: 12, weight: .semibold))
             processCountBadge
             Spacer()
-            Button("返回") {
+            Button(l10n.text(.back)) {
                 state.cancelTerminateRunningCodex()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            Button("结束并切换") {
+            Button(l10n.text(.terminateAndSwitch)) {
                 state.confirmTerminateRunningCodexAndSwitch()
             }
             .buttonStyle(.bordered)
@@ -141,7 +143,7 @@ struct PopoverRoot: View {
     }
 
     private var processCountBadge: some View {
-        Text("\(state.runningCodexHits.count) 个进程")
+        Text(l10n.format(.processCountFormat, state.runningCodexHits.count))
             .font(.caption2)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 5)
@@ -179,7 +181,7 @@ struct PopoverRoot: View {
             }
             .buttonStyle(.plain)
             .disabled(state.usageRefreshInProgress)
-            .help(state.usageRefreshInProgress ? "正在刷新用量" : "刷新所有账户的用量")
+            .help(state.usageRefreshInProgress ? l10n.text(.refreshingUsage) : l10n.text(.refreshUsageHelp))
 
             Button {
                 showingSettings = true
@@ -187,28 +189,28 @@ struct PopoverRoot: View {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(.plain)
-            .help("设置")
+            .help(l10n.text(.settingsHelp))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
 
     private var refreshTimestampLabel: String? {
-        if state.usageRefreshInProgress { return "更新中" }
+        if state.usageRefreshInProgress { return l10n.text(.updateInProgress) }
         guard let date = state.lastSuccessfulUsageRefreshAt else { return nil }
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = state.appLanguage.locale
         formatter.dateFormat = Calendar.current.isDateInToday(date) ? "HH:mm" : "M/d HH:mm"
-        return "更新 \(formatter.string(from: date))"
+        return l10n.format(.updatedAtFormat, formatter.string(from: date))
     }
 
     private var refreshTimestampHelp: String {
-        if state.usageRefreshInProgress { return "正在刷新用量" }
-        guard let date = state.lastSuccessfulUsageRefreshAt else { return "暂无成功刷新" }
+        if state.usageRefreshInProgress { return l10n.text(.refreshingUsage) }
+        guard let date = state.lastSuccessfulUsageRefreshAt else { return l10n.text(.noSuccessfulRefresh) }
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = state.appLanguage.locale
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return "上次刷新成功：\(formatter.string(from: date))"
+        return l10n.format(.lastSuccessfulRefreshFormat, formatter.string(from: date))
     }
 
     @ViewBuilder
@@ -232,6 +234,7 @@ struct PopoverRoot: View {
                             hideEmail: state.hideAccountEmail,
                             showSparkUsage: state.showSparkUsage,
                             showUsageResetTime: state.showUsageResetTime,
+                            language: state.appLanguage,
                             onSwitch: { state.requestSwitch(to: account) },
                             onRemove: { state.removeAccount(account) }
                         )
@@ -270,14 +273,14 @@ struct PopoverRoot: View {
                             )
                     }
                 }
-                Text("现有 Codex 登录 · \(candidate.sourceLabel)")
+                Text(l10n.format(.existingCodexLoginFormat, candidate.sourceLabel))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer()
-            Button("接管") {
+            Button(l10n.text(.takeover)) {
                 state.takeoverCodexAccount(candidate)
             }
         }
@@ -305,7 +308,7 @@ struct PopoverRoot: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("关闭")
+            .help(l10n.text(.close))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -326,16 +329,16 @@ struct PopoverRoot: View {
                 HStack(spacing: 4) {
                     if state.loginInProgress {
                         ProgressView().controlSize(.small)
-                        Text("取消登录")
+                        Text(l10n.text(.cancelLogin))
                     } else {
                         Image(systemName: "plus")
-                        Text("添加账户")
+                        Text(l10n.text(.addAccount))
                     }
                 }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .help(state.loginInProgress ? "停止等待浏览器登录" : "添加账户")
+            .help(state.loginInProgress ? l10n.text(.cancelLoginHelp) : l10n.text(.addAccountHelp))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

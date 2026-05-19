@@ -6,10 +6,13 @@ struct AccountRow: View {
     let hideEmail: Bool
     let showSparkUsage: Bool
     let showUsageResetTime: Bool
+    let language: AppLanguage
     let onSwitch: () -> Void
     let onRemove: () -> Void
 
     @State private var confirmingRemove = false
+
+    private var l10n: L10n { L10n(language: language) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -43,7 +46,7 @@ struct AccountRow: View {
             }
             .buttonStyle(.plain)
             .disabled(account.isActive)
-            .help(account.isActive ? "当前活跃账户" : "切换到此账户")
+            .help(account.isActive ? l10n.text(.activeAccountHelp) : l10n.text(.switchAccountHelp))
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
@@ -60,7 +63,7 @@ struct AccountRow: View {
                     planBadge
                     statusBadge
                     if account.isActive {
-                        smallBadge("当前")
+                        smallBadge(l10n.text(.current))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,26 +81,26 @@ struct AccountRow: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("移除账户")
+            .help(l10n.text(.removeAccountHelp))
         }
     }
 
     private var removeConfirmRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("移除 \(displayName)?")
+            Text(l10n.format(.removeAccountFormat, displayName))
                 .font(.system(size: 13, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.middle)
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("退出登录并删除本地数据")
+                Text(l10n.text(.removeAccountDetail))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                Button("取消") { confirmingRemove = false }
+                Button(l10n.text(.cancel)) { confirmingRemove = false }
                     .keyboardShortcut(.cancelAction)
-                Button("移除", role: .destructive) {
+                Button(l10n.text(.remove), role: .destructive) {
                     confirmingRemove = false
                     onRemove()
                 }
@@ -128,11 +131,11 @@ struct AccountRow: View {
     private var statusBadge: some View {
         switch state {
         case .tokenExpired:
-            smallBadge("过期", foreground: .orange, background: Color.orange.opacity(0.10))
+            smallBadge(l10n.text(.expired), foreground: .orange, background: Color.orange.opacity(0.10))
         case .authInvalid:
-            smallBadge("失效", foreground: .orange, background: Color.orange.opacity(0.10))
+            smallBadge(l10n.text(.invalid), foreground: .orange, background: Color.orange.opacity(0.10))
         case .failed:
-            smallBadge("错误", foreground: .secondary, background: Color.secondary.opacity(0.12))
+            smallBadge(l10n.text(.error), foreground: .secondary, background: Color.secondary.opacity(0.12))
         default:
             EmptyView()
         }
@@ -161,28 +164,28 @@ struct AccountRow: View {
         switch state {
         case .idle, .loading:
             VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: nil, showResetTime: showUsageResetTime)
-                UsageBar(title: "week", snapshot: nil, showResetTime: showUsageResetTime)
+                UsageBar(title: "5h", snapshot: nil, showResetTime: showUsageResetTime, language: language)
+                UsageBar(title: l10n.text(.week), snapshot: nil, showResetTime: showUsageResetTime, language: language)
             }
         case .loaded(_, let primary, let secondary, let additional):
             VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: primary, showResetTime: showUsageResetTime)
-                UsageBar(title: "week", snapshot: secondary, showResetTime: showUsageResetTime)
+                UsageBar(title: "5h", snapshot: primary, showResetTime: showUsageResetTime, language: language)
+                UsageBar(title: l10n.text(.week), snapshot: secondary, showResetTime: showUsageResetTime, language: language)
                 if showSparkUsage {
                     ForEach(Array(sparkLimits(from: additional).enumerated()), id: \.offset) { _, limit in
                         if limit.primary != nil {
-                            UsageBar(title: "\(limit.displayName) 5h", snapshot: limit.primary, showResetTime: showUsageResetTime)
+                            UsageBar(title: "\(limit.displayName) 5h", snapshot: limit.primary, showResetTime: showUsageResetTime, language: language)
                         }
                         if limit.secondary != nil {
-                            UsageBar(title: "\(limit.displayName) week", snapshot: limit.secondary, showResetTime: showUsageResetTime)
+                            UsageBar(title: "\(limit.displayName) \(l10n.text(.week))", snapshot: limit.secondary, showResetTime: showUsageResetTime, language: language)
                         }
                     }
                 }
             }
         case .tokenExpired(let raw):
-            compactStatusLine(raw ?? "过期")
+            compactStatusLine(raw ?? l10n.text(.expired))
         case .authInvalid(let raw):
-            compactStatusLine(raw ?? "失效")
+            compactStatusLine(raw ?? l10n.text(.invalid))
         case .noToken:
             compactStatusLine("tokens missing")
         case .failed(let msg):

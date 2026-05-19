@@ -4,6 +4,7 @@ struct UsageBar: View {
     let title: String
     let snapshot: WindowSnapshot?
     let showResetTime: Bool
+    let language: AppLanguage
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -29,7 +30,7 @@ struct UsageBar: View {
         guard let reset = snapshot.resetAt else { return percent }
         let relative = formatTimeUntil(reset, now: now)
         guard showResetTime else { return "\(percent) · \(relative)" }
-        return "\(percent) · \(relative) · \(formatResetTime(reset, now: now))"
+        return "\(percent) · \(relative) · \(formatResetTime(reset, now: now, language: language))"
     }
 
     private var titleWidth: CGFloat {
@@ -69,10 +70,10 @@ func formatTimeUntil(_ date: Date, now: Date = .now) -> String {
     return "\(minutes)m"
 }
 
-func formatResetTime(_ date: Date, now: Date = .now) -> String {
+func formatResetTime(_ date: Date, now: Date = .now, language: AppLanguage = .current) -> String {
     let calendar = Calendar.current
     let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.locale = language.locale
 
     if calendar.isDateInToday(date) {
         formatter.dateFormat = "HH:mm"
@@ -81,7 +82,7 @@ func formatResetTime(_ date: Date, now: Date = .now) -> String {
 
     if calendar.isDateInTomorrow(date) {
         formatter.dateFormat = "HH:mm"
-        return "明天 \(formatter.string(from: date))"
+        return L10n.format(.tomorrowFormat, formatter.string(from: date), language: language)
     }
 
     formatter.dateFormat = "M/d HH:mm"

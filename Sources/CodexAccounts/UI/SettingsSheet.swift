@@ -8,6 +8,8 @@ struct SettingsPane: View {
     @State private var aliasDrafts: [String: String] = [:]
     @State private var aliasesExpanded = false
 
+    private var l10n: L10n { L10n(language: state.appLanguage) }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -34,7 +36,7 @@ struct SettingsPane: View {
             }
             .buttonStyle(.plain)
             Spacer()
-            Text("设置").font(.system(size: 13, weight: .semibold))
+            Text(l10n.text(.settings)).font(.system(size: 13, weight: .semibold))
             Spacer()
             Color.clear.frame(width: 12, height: 1)
         }
@@ -45,7 +47,7 @@ struct SettingsPane: View {
     @ViewBuilder
     private var content: some View {
         VStack(alignment: .leading, spacing: 14) {
-            settingsSection("偏好") {
+            settingsSection(l10n.text(.preferences)) {
                 privacyBlock
             }
 
@@ -59,7 +61,7 @@ struct SettingsPane: View {
 
             Divider()
 
-            settingsSection("codex 命令") {
+            settingsSection(l10n.text(.codexCommand)) {
                 if let status = state.shimStatus {
                     shimBlock(status)
                 } else {
@@ -76,14 +78,14 @@ struct SettingsPane: View {
     private var aliasBlock: some View {
         VStack(alignment: .leading, spacing: 7) {
             if state.accounts.isEmpty {
-                Text("暂无账号")
+                Text(l10n.text(.noAccounts))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(state.accounts) { account in
                     aliasRow(account)
                 }
-                Text("命令示例: codex @\(state.accounts.first?.alias ?? "ash")")
+                Text(l10n.format(.commandExampleFormat, state.accounts.first?.alias ?? "ash"))
                     .font(.caption2.monospaced())
                     .foregroundStyle(.secondary)
             }
@@ -98,7 +100,7 @@ struct SettingsPane: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Text("账号别名")
+                    Text(l10n.text(.accountAliases))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -121,7 +123,7 @@ struct SettingsPane: View {
     }
 
     private var aliasSummary: String {
-        state.accounts.isEmpty ? "暂无账号" : "\(state.accounts.count) 个账号"
+        state.accounts.isEmpty ? l10n.text(.noAccounts) : l10n.format(.accountCountFormat, state.accounts.count)
     }
 
     private func aliasRow(_ account: Account) -> some View {
@@ -145,7 +147,7 @@ struct SettingsPane: View {
                 .frame(width: 84)
                 .onSubmit { saveAlias(account) }
 
-            Button("保存") {
+            Button(l10n.text(.save)) {
                 saveAlias(account)
             }
             .buttonStyle(.bordered)
@@ -168,64 +170,86 @@ struct SettingsPane: View {
 
     private var privacyBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
+            languageRow
+
             settingToggle(
-                title: "隐藏账号邮箱",
+                title: l10n.text(.hideAccountEmail),
                 isOn: Binding(
                     get: { state.hideAccountEmail },
                     set: { state.setHideAccountEmail($0) }
                 )
             )
-            .help("开启后保留邮箱前缀和域名，隐藏中间部分")
+            .help(l10n.text(.hideAccountEmailHelp))
 
             settingToggle(
-                title: "显示 Spark 额度",
+                title: l10n.text(.showSparkUsage),
                 isOn: Binding(
                     get: { state.showSparkUsage },
                     set: { state.setShowSparkUsage($0) }
                 )
             )
-            .help("开启后，如果 ChatGPT 用量接口返回 Spark 或 codex_other 附加限额，会在账号列表中显示")
+            .help(l10n.text(.showSparkUsageHelp))
 
             settingToggle(
-                title: "显示额度重置时间",
-                detail: "倒计时后显示几点或日期",
+                title: l10n.text(.showUsageResetTime),
+                detail: l10n.text(.showUsageResetTimeDetail),
                 isOn: Binding(
                     get: { state.showUsageResetTime },
                     set: { state.setShowUsageResetTime($0) }
                 )
             )
-            .help("默认关闭；开启后在每个额度倒计时后追加具体重置时间，跨天显示日期")
+            .help(l10n.text(.showUsageResetTimeHelp))
 
             settingToggle(
-                title: "共享记录和状态",
-                detail: "会话、goal、缓存、插件、技能",
+                title: l10n.text(.shareCodexData),
+                detail: l10n.text(.shareCodexDataDetail),
                 isOn: Binding(
                     get: { state.shareCodexData },
                     set: { state.setShareCodexData($0) }
                 ),
                 isDisabled: state.shareCodexDataBusy
             )
-            .help("共享会话、goal、state_5.sqlite、memories、automations、worktrees、skills、plugins、图片和缓存；不共享登录、配置、环境变量和日志")
+            .help(l10n.text(.shareCodexDataHelp))
 
             settingToggle(
-                title: "共享配置",
-                detail: "config.toml、AGENTS、规则",
+                title: l10n.text(.shareCodexConfig),
+                detail: l10n.text(.shareCodexConfigDetail),
                 isOn: Binding(
                     get: { state.shareCodexConfig },
                     set: { state.setShareCodexConfig($0) }
                 ),
                 isDisabled: state.shareCodexConfigBusy
             )
-            .help("共享 config.toml、AGENTS.md、hooks.json、keybindings.json、rules 和 prompts；不共享 auth.json、环境变量和日志")
+            .help(l10n.text(.shareCodexConfigHelp))
 
             settingToggle(
-                title: "开机自启",
+                title: l10n.text(.launchAtLogin),
                 isOn: Binding(
                     get: { state.launchAtLogin },
                     set: { state.setLaunchAtLogin($0) }
                 )
             )
-            .help("使用 macOS 登录项；默认关闭")
+            .help(l10n.text(.launchAtLoginHelp))
+        }
+    }
+
+    private var languageRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(l10n.text(.language))
+                .font(.system(size: 12, weight: .semibold))
+            Spacer()
+            Picker("", selection: Binding(
+                get: { state.appLanguage },
+                set: { state.setAppLanguage($0) }
+            )) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.displayName(in: state.appLanguage)).tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(width: 150)
         }
     }
 
@@ -279,7 +303,7 @@ struct SettingsPane: View {
     private func shimBlock(_ status: ShimInstaller.Status) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("状态")
+                Text(l10n.text(.status))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
                 statusLabel(status)
@@ -287,11 +311,11 @@ struct SettingsPane: View {
 
             if let real = status.detectedRealCodex {
                 VStack(alignment: .leading, spacing: 5) {
-                    pathRow(label: "入口", value: status.installPath)
-                    pathRow(label: "真实", value: real)
+                    pathRow(label: l10n.text(.entry), value: status.installPath)
+                    pathRow(label: l10n.text(.real), value: real)
                 }
             } else {
-                Text("未检测到 codex")
+                Text(l10n.text(.codexNotDetected))
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -315,14 +339,14 @@ struct SettingsPane: View {
                 .disabled((status.detectedRealCodex ?? "").isEmpty && customRealPath.isEmpty)
 
                 if status.installed != .missing {
-                    Button("卸载") { state.uninstallShim() }
+                    Button(l10n.text(.uninstall)) { state.uninstallShim() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
 
                 Spacer()
 
-                Button(showCustomPath ? "收起" : "自定义路径") {
+                Button(showCustomPath ? l10n.text(.collapse) : l10n.text(.customPath)) {
                     showCustomPath.toggle()
                 }
                 .buttonStyle(.plain)
@@ -341,9 +365,9 @@ struct SettingsPane: View {
     private func statusLabel(_ status: ShimInstaller.Status) -> some View {
         let (text, color): (String, Color) = {
             switch status.installed {
-            case .missing: return ("未安装", .secondary)
-            case .ours: return ("已接管", .green)
-            case .foreign: return ("未接管", .secondary)
+            case .missing: return (l10n.text(.shimMissing), .secondary)
+            case .ours: return (l10n.text(.shimManaged), .green)
+            case .foreign: return (l10n.text(.shimUnmanaged), .secondary)
             }
         }()
         return Text(text)
@@ -352,11 +376,11 @@ struct SettingsPane: View {
     }
 
     private func installLabel(_ status: ShimInstaller.Status) -> String {
-        if status.shimNeedsUpdate { return "更新" }
+        if status.shimNeedsUpdate { return l10n.text(.update) }
         switch status.installed {
-            case .missing: return "安装"
-            case .ours: return "重装"
-            case .foreign: return "接管"
+            case .missing: return l10n.text(.install)
+            case .ours: return l10n.text(.reinstall)
+            case .foreign: return l10n.text(.takeover)
         }
     }
 
@@ -380,7 +404,7 @@ struct SettingsPane: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.caption)
                 .foregroundStyle(.orange)
-            Text("当前终端仍会绕过接管")
+            Text(l10n.text(.terminalBypassesTakeover))
                 .font(.caption)
                 .foregroundStyle(.orange)
             Spacer()
@@ -389,7 +413,7 @@ struct SettingsPane: View {
 
     private func shimErrorBlock(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("自动接管失败")
+            Text(l10n.text(.autoTakeoverFailed))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(message)
@@ -433,7 +457,7 @@ struct SettingsPane: View {
     private var quitRow: some View {
         HStack {
             Spacer()
-            Button("退出 Codex Accounts") { NSApp.terminate(nil) }
+            Button(l10n.text(.quitApp)) { NSApp.terminate(nil) }
                 .buttonStyle(.plain)
                 .font(.caption)
                 .foregroundStyle(.secondary)

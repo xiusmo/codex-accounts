@@ -22,6 +22,7 @@ final class AppState: ObservableObject {
     @Published var runningCodexHits: [CodexProcessDetector.Hit] = []
     @Published var pendingSwitch: Account?
     @Published var confirmingTerminateRunningCodex = false
+    @Published var appLanguage: AppLanguage
     @Published var hideAccountEmail: Bool
     @Published var showSparkUsage: Bool
     @Published var showUsageResetTime: Bool
@@ -55,6 +56,7 @@ final class AppState: ObservableObject {
          oauth: OAuthLogin = OAuthLogin(),
          logout: OAuthLogout = OAuthLogout(),
          sharedData: SharedCodexData? = nil) {
+        self.appLanguage = AppLanguage.current
         self.hideAccountEmail = UserDefaults.standard.bool(forKey: Self.hideAccountEmailKey)
         self.showSparkUsage = UserDefaults.standard.object(forKey: Self.showSparkUsageKey) as? Bool ?? true
         self.showUsageResetTime = UserDefaults.standard.bool(forKey: Self.showUsageResetTimeKey)
@@ -113,6 +115,11 @@ final class AppState: ObservableObject {
 
     func refreshLaunchAtLoginStatus() {
         launchAtLogin = LaunchAtLogin.isEnabled
+    }
+
+    func setAppLanguage(_ language: AppLanguage) {
+        appLanguage = language
+        UserDefaults.standard.set(language.rawValue, forKey: AppLanguage.defaultsKey)
     }
 
     func setHideAccountEmail(_ hidden: Bool) {
@@ -560,12 +567,9 @@ private enum ShimAutoTakeoverError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .codexNotFound:
-            return "codex executable not found in interactive PATH"
+            return L10n.text(.shimCodexNotFound)
         case let .commandStillBypassesShim(installPath, interactivePATH):
-            return """
-            installed shim at \(installPath), but the interactive shell still resolves codex to another executable
-            PATH=\(interactivePATH)
-            """
+            return L10n.format(.shimStillBypassesFormat, installPath, interactivePATH)
         }
     }
 }

@@ -13,12 +13,18 @@ enum OAuthError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .portsUnavailable: return "本地登录回调端口 1455 和 1457 都不可用。请关闭其他正在登录的 Codex 或 Codex Accounts 窗口后重试。"
-        case .stateMismatch: return "登录回调校验失败。请重新点击「添加账户」，不要复用之前打开的登录页面。"
-        case .missingCode: return "浏览器没有返回授权码。请重新登录一次。"
-        case .providerError(let msg): return "OpenAI 登录返回错误：\(msg)"
-        case .tokenExchangeFailed(let msg): return "换取登录凭证失败：\(msg)"
-        case .cancelled: return "登录已取消或超时。"
+        case .portsUnavailable:
+            return L10n.text(.oauthPortsUnavailable)
+        case .stateMismatch:
+            return L10n.text(.oauthStateMismatch)
+        case .missingCode:
+            return L10n.text(.oauthMissingCode)
+        case .providerError(let msg):
+            return L10n.format(.oauthProviderErrorFormat, msg)
+        case .tokenExchangeFailed(let msg):
+            return L10n.format(.oauthTokenExchangeFailedFormat, msg)
+        case .cancelled:
+            return L10n.text(.oauthCancelled)
         }
     }
 }
@@ -93,17 +99,17 @@ final class OAuthLogin {
             case .EADDRINUSE:
                 return OAuthError.portsUnavailable.localizedDescription
             case .EINVAL:
-                return "本地登录回调服务启动失败。请退出其他正在登录的 Codex 或 Codex Accounts 进程后重试；如果仍然失败，重启 Codex Accounts。"
+                return L10n.text(.oauthCallbackStartFailed)
             case .EACCES:
-                return "没有权限启动本地登录回调服务。请重新打开 Codex Accounts 后再试。"
+                return L10n.text(.oauthCallbackPermissionDenied)
             default:
-                return "本地登录回调服务遇到网络错误（\(posixError.code.rawValue)）。请稍后重试，或重启 Codex Accounts。"
+                return L10n.format(.oauthCallbackNetworkErrorFormat, posixError.code.rawValue)
             }
         }
 
         let message = error.localizedDescription
         if message.contains("Network.NWError error 22") || message.contains("Invalid argument") {
-            return "本地登录回调服务启动失败。请退出其他正在登录的 Codex 或 Codex Accounts 进程后重试；如果仍然失败，重启 Codex Accounts。"
+            return L10n.text(.oauthCallbackStartFailed)
         }
         return message
     }
@@ -402,21 +408,28 @@ private final class LoopbackCallbackServer {
 
         if let errorCode {
             let msg = errorDesc ?? errorCode
-            send(clientFD, status: "200 OK", body: htmlPage(title: "登录失败", body: "OAuth provider returned an error: \(escapeHTML(msg))"))
+            send(
+                clientFD,
+                status: "200 OK",
+                body: htmlPage(
+                    title: L10n.text(.loginFailedTitle),
+                    body: L10n.format(.oauthProviderReturnedErrorFormat, msg)
+                )
+            )
             resume(with: .failure(OAuthError.providerError(msg)))
             return
         }
         guard state == expectedState else {
-            send(clientFD, status: "200 OK", body: htmlPage(title: "登录失败", body: "OAuth state parameter mismatch."))
+            send(clientFD, status: "200 OK", body: htmlPage(title: L10n.text(.loginFailedTitle), body: L10n.text(.oauthStateMismatchPage)))
             resume(with: .failure(OAuthError.stateMismatch))
             return
         }
         guard let code, !code.isEmpty else {
-            send(clientFD, status: "200 OK", body: htmlPage(title: "登录失败", body: "Missing authorization code."))
+            send(clientFD, status: "200 OK", body: htmlPage(title: L10n.text(.loginFailedTitle), body: L10n.text(.oauthMissingCodePage)))
             resume(with: .failure(OAuthError.missingCode))
             return
         }
-        send(clientFD, status: "200 OK", body: htmlPage(title: "登录成功", body: "可以关闭此页。"))
+        send(clientFD, status: "200 OK", body: htmlPage(title: L10n.text(.loginSucceededTitle), body: L10n.text(.closeThisPage)))
         resume(with: .success(code))
     }
 
