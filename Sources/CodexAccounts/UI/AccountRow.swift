@@ -6,6 +6,8 @@ struct AccountRow: View {
     let hideEmail: Bool
     let showSparkUsage: Bool
     let showUsageResetTime: Bool
+    let showDailyUsageBaseline: Bool
+    let dailyUsageBaselines: [String: UsageBaselineSnapshot]
     let language: AppLanguage
     let onSwitch: () -> Void
     let onRemove: () -> Void
@@ -164,20 +166,32 @@ struct AccountRow: View {
         switch state {
         case .idle, .loading:
             VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: nil, showResetTime: showUsageResetTime, language: language)
-                UsageBar(title: l10n.text(.week), snapshot: nil, showResetTime: showUsageResetTime, language: language)
+                UsageBar(title: "5h", snapshot: nil, baseline: nil, showResetTime: showUsageResetTime, language: language)
+                UsageBar(title: l10n.text(.week), snapshot: nil, baseline: nil, showResetTime: showUsageResetTime, language: language)
             }
         case .loaded(_, let primary, let secondary, let additional):
             VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: primary, showResetTime: showUsageResetTime, language: language)
-                UsageBar(title: l10n.text(.week), snapshot: secondary, showResetTime: showUsageResetTime, language: language)
+                UsageBar(title: "5h", snapshot: primary, baseline: baseline(for: UsageBaselineMetricKey.primary), showResetTime: showUsageResetTime, language: language)
+                UsageBar(title: l10n.text(.week), snapshot: secondary, baseline: baseline(for: UsageBaselineMetricKey.secondary), showResetTime: showUsageResetTime, language: language)
                 if showSparkUsage {
-                    ForEach(Array(sparkLimits(from: additional).enumerated()), id: \.offset) { _, limit in
+                    ForEach(sparkLimits(from: additional), id: \.offset) { index, limit in
                         if limit.primary != nil {
-                            UsageBar(title: "\(limit.displayName) 5h", snapshot: limit.primary, showResetTime: showUsageResetTime, language: language)
+                            UsageBar(
+                                title: "\(limit.displayName) 5h",
+                                snapshot: limit.primary,
+                                baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .primary)),
+                                showResetTime: showUsageResetTime,
+                                language: language
+                            )
                         }
                         if limit.secondary != nil {
-                            UsageBar(title: "\(limit.displayName) \(l10n.text(.week))", snapshot: limit.secondary, showResetTime: showUsageResetTime, language: language)
+                            UsageBar(
+                                title: "\(limit.displayName) \(l10n.text(.week))",
+                                snapshot: limit.secondary,
+                                baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .secondary)),
+                                showResetTime: showUsageResetTime,
+                                language: language
+                            )
                         }
                     }
                 }
@@ -205,9 +219,13 @@ struct AccountRow: View {
         }
     }
 
-    private func sparkLimits(from additional: [AdditionalUsageSnapshot]) -> [AdditionalUsageSnapshot] {
-        additional.filter { limit in
+    private func sparkLimits(from additional: [AdditionalUsageSnapshot]) -> [(offset: Int, element: AdditionalUsageSnapshot)] {
+        Array(additional.enumerated()).filter { _, limit in
             limit.isSparkLimit && (limit.primary != nil || limit.secondary != nil)
         }
+    }
+
+    private func baseline(for key: String) -> UsageBaselineSnapshot? {
+        showDailyUsageBaseline ? dailyUsageBaselines[key] : nil
     }
 }

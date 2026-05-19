@@ -234,6 +234,8 @@ struct PopoverRoot: View {
                             hideEmail: state.hideAccountEmail,
                             showSparkUsage: state.showSparkUsage,
                             showUsageResetTime: state.showUsageResetTime,
+                            showDailyUsageBaseline: state.showDailyUsageBaseline,
+                            dailyUsageBaselines: state.dailyUsageBaselines[account.directoryName] ?? [:],
                             language: state.appLanguage,
                             onSwitch: { state.requestSwitch(to: account) },
                             onRemove: { state.removeAccount(account) }

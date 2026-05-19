@@ -6,6 +6,7 @@ final class AppState: ObservableObject {
     private static let hideAccountEmailKey = "hideAccountEmail"
     private static let showSparkUsageKey = "showSparkUsage"
     private static let showUsageResetTimeKey = "showUsageResetTime"
+    private static let showDailyUsageBaselineKey = "showDailyUsageBaseline"
     private static let shareCodexDataKey = "shareCodexData"
     private static let shareCodexConfigKey = "shareCodexConfig"
     private static let disableAutoTakeoverKey = "disableAutoTakeover"
@@ -26,6 +27,8 @@ final class AppState: ObservableObject {
     @Published var hideAccountEmail: Bool
     @Published var showSparkUsage: Bool
     @Published var showUsageResetTime: Bool
+    @Published var showDailyUsageBaseline: Bool
+    @Published var dailyUsageBaselines: [String: [String: UsageBaselineSnapshot]]
     @Published var shareCodexData: Bool
     @Published var shareCodexDataBusy = false
     @Published var shareCodexConfig: Bool
@@ -42,6 +45,7 @@ final class AppState: ObservableObject {
     let oauth: OAuthLogin
     let logout: OAuthLogout
     let sharedData: SharedCodexData
+    private let usageBaselineStore: UsageBaselineStore
     private var loginTask: Task<Void, Never>?
     private var shareCodexDataTask: Task<Void, Never>?
     private var shareCodexConfigTask: Task<Void, Never>?
@@ -55,11 +59,14 @@ final class AppState: ObservableObject {
          shim: ShimInstaller = ShimInstaller(),
          oauth: OAuthLogin = OAuthLogin(),
          logout: OAuthLogout = OAuthLogout(),
-         sharedData: SharedCodexData? = nil) {
+         sharedData: SharedCodexData? = nil,
+         usageBaselineStore: UsageBaselineStore = UsageBaselineStore()) {
         self.appLanguage = AppLanguage.current
         self.hideAccountEmail = UserDefaults.standard.bool(forKey: Self.hideAccountEmailKey)
         self.showSparkUsage = UserDefaults.standard.object(forKey: Self.showSparkUsageKey) as? Bool ?? true
         self.showUsageResetTime = UserDefaults.standard.bool(forKey: Self.showUsageResetTimeKey)
+        self.showDailyUsageBaseline = UserDefaults.standard.bool(forKey: Self.showDailyUsageBaselineKey)
+        self.dailyUsageBaselines = usageBaselineStore.today()
         self.shareCodexData = UserDefaults.standard.bool(forKey: Self.shareCodexDataKey)
         self.shareCodexConfig = UserDefaults.standard.bool(forKey: Self.shareCodexConfigKey)
         self.launchAtLogin = LaunchAtLogin.isEnabled
@@ -70,6 +77,7 @@ final class AppState: ObservableObject {
         self.oauth = oauth
         self.logout = logout
         self.sharedData = sharedData ?? SharedCodexData(accountsBaseURL: store.baseURL)
+        self.usageBaselineStore = usageBaselineStore
 
         Task { @MainActor in
             self.reload()
@@ -135,6 +143,12 @@ final class AppState: ObservableObject {
     func setShowUsageResetTime(_ enabled: Bool) {
         showUsageResetTime = enabled
         UserDefaults.standard.set(enabled, forKey: Self.showUsageResetTimeKey)
+    }
+
+    func setShowDailyUsageBaseline(_ enabled: Bool) {
+        showDailyUsageBaseline = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.showDailyUsageBaselineKey)
+        dailyUsageBaselines = usageBaselineStore.today()
     }
 
     func setShareCodexData(_ enabled: Bool) {
@@ -256,6 +270,7 @@ final class AppState: ObservableObject {
     // MARK: - Usage refresh (on popover open / manual refresh)
 
     func refreshAllUsageIfStale() async {
+        dailyUsageBaselines = usageBaselineStore.today()
         guard !usageRefreshInProgress else { return }
 
         let now = Date()
@@ -269,6 +284,7 @@ final class AppState: ObservableObject {
 
     func refreshAllUsage() async {
         guard !usageRefreshInProgress else { return }
+        dailyUsageBaselines = usageBaselineStore.today()
         lastUsageRefreshStartedAt = Date()
         usageRefreshInProgress = true
         defer { usageRefreshInProgress = false }
@@ -294,6 +310,7 @@ final class AppState: ObservableObject {
             for await (key, value) in group {
                 if case .loaded = value {
                     hasSuccessfulUsage = true
+                    dailyUsageBaselines = usageBaselineStore.recordToday(accountKey: key, state: value)
                 }
                 withAnimation(Self.accountMoveAnimation) {
                     usage[key] = value

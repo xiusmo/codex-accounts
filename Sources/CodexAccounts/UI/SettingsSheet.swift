@@ -201,6 +201,16 @@ struct SettingsPane: View {
             .help(l10n.text(.showUsageResetTimeHelp))
 
             settingToggle(
+                title: l10n.text(.showDailyUsageBaseline),
+                detail: l10n.text(.showDailyUsageBaselineDetail),
+                isOn: Binding(
+                    get: { state.showDailyUsageBaseline },
+                    set: { state.setShowDailyUsageBaseline($0) }
+                )
+            )
+            .help(l10n.text(.showDailyUsageBaselineHelp))
+
+            settingToggle(
                 title: l10n.text(.shareCodexData),
                 detail: l10n.text(.shareCodexDataDetail),
                 isOn: Binding(
@@ -238,18 +248,32 @@ struct SettingsPane: View {
             Text(l10n.text(.language))
                 .font(.system(size: 12, weight: .semibold))
             Spacer()
-            Picker("", selection: Binding(
-                get: { state.appLanguage },
-                set: { state.setAppLanguage($0) }
-            )) {
+            Menu {
                 ForEach(AppLanguage.allCases) { language in
-                    Text(language.displayName(in: state.appLanguage)).tag(language)
+                    Button {
+                        state.setAppLanguage(language)
+                    } label: {
+                        if language == state.appLanguage {
+                            Label(language.displayName(in: state.appLanguage), systemImage: "checkmark")
+                        } else {
+                            Text(language.displayName(in: state.appLanguage))
+                        }
+                    }
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    Text(state.appLanguage.displayName(in: state.appLanguage))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(width: 118)
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            .menuStyle(.button)
+            .buttonStyle(.bordered)
             .controlSize(.small)
-            .frame(width: 150)
         }
     }
 

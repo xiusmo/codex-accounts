@@ -71,6 +71,10 @@ enum L10nKey: String {
     case showUsageResetTime
     case showUsageResetTimeDetail
     case showUsageResetTimeHelp
+    case showDailyUsageBaseline
+    case showDailyUsageBaselineDetail
+    case showDailyUsageBaselineHelp
+    case dailyUsageBaselineHelpFormat
     case shareCodexData
     case shareCodexDataDetail
     case shareCodexDataHelp
@@ -195,6 +199,10 @@ struct L10n {
         .showUsageResetTime: "显示额度重置时间",
         .showUsageResetTimeDetail: "倒计时后显示几点或日期",
         .showUsageResetTimeHelp: "默认关闭；开启后在每个额度倒计时后追加具体重置时间，跨天显示日期",
+        .showDailyUsageBaseline: "显示每日初始额度",
+        .showDailyUsageBaselineDetail: "用浮标标出当天基线",
+        .showDailyUsageBaselineHelp: "默认关闭；应用会持续记录当天第一次刷新到的额度作为基线，最多保留最近 8 天记录",
+        .dailyUsageBaselineHelpFormat: "今日已用 %@ · 基线 %@",
         .shareCodexData: "共享记录和状态",
         .shareCodexDataDetail: "会话、goal、缓存、插件、技能",
         .shareCodexDataHelp: "共享会话、goal、state_5.sqlite、memories、automations、worktrees、skills、plugins、图片和缓存；不共享登录、配置、环境变量和日志",
@@ -291,6 +299,10 @@ struct L10n {
         .showUsageResetTime: "Show reset time",
         .showUsageResetTimeDetail: "Show clock time or date after countdown",
         .showUsageResetTimeHelp: "Off by default; appends the concrete reset time after each usage countdown, with dates for future days",
+        .showDailyUsageBaseline: "Show daily baseline",
+        .showDailyUsageBaselineDetail: "Mark today's baseline on usage bars",
+        .showDailyUsageBaselineHelp: "Off by default; the app continuously records the first usage value seen each day as the baseline and keeps at most the last 8 days",
+        .dailyUsageBaselineHelpFormat: "Used today %@ · baseline %@",
         .shareCodexData: "Share history and state",
         .shareCodexDataDetail: "Sessions, goals, cache, plugins, skills",
         .shareCodexDataHelp: "Shares sessions, goals, state_5.sqlite, memories, automations, worktrees, skills, plugins, images, and cache; does not share auth, config, environment, or logs",
