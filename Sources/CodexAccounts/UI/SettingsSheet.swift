@@ -187,6 +187,16 @@ struct SettingsPane: View {
             .help("开启后，如果 ChatGPT 用量接口返回 Spark 或 codex_other 附加限额，会在账号列表中显示")
 
             settingToggle(
+                title: "显示额度重置时间",
+                detail: "倒计时后显示几点或日期",
+                isOn: Binding(
+                    get: { state.showUsageResetTime },
+                    set: { state.setShowUsageResetTime($0) }
+                )
+            )
+            .help("默认关闭；开启后在每个额度倒计时后追加具体重置时间，跨天显示日期")
+
+            settingToggle(
                 title: "共享记录和状态",
                 detail: "会话、goal、缓存、插件、技能",
                 isOn: Binding(

@@ -5,6 +5,7 @@ struct AccountRow: View {
     let state: UsageState
     let hideEmail: Bool
     let showSparkUsage: Bool
+    let showUsageResetTime: Bool
     let onSwitch: () -> Void
     let onRemove: () -> Void
 
@@ -160,20 +161,20 @@ struct AccountRow: View {
         switch state {
         case .idle, .loading:
             VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: nil)
-                UsageBar(title: "week", snapshot: nil)
+                UsageBar(title: "5h", snapshot: nil, showResetTime: showUsageResetTime)
+                UsageBar(title: "week", snapshot: nil, showResetTime: showUsageResetTime)
             }
         case .loaded(_, let primary, let secondary, let additional):
             VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: primary)
-                UsageBar(title: "week", snapshot: secondary)
+                UsageBar(title: "5h", snapshot: primary, showResetTime: showUsageResetTime)
+                UsageBar(title: "week", snapshot: secondary, showResetTime: showUsageResetTime)
                 if showSparkUsage {
                     ForEach(Array(sparkLimits(from: additional).enumerated()), id: \.offset) { _, limit in
                         if limit.primary != nil {
-                            UsageBar(title: "\(limit.displayName) 5h", snapshot: limit.primary)
+                            UsageBar(title: "\(limit.displayName) 5h", snapshot: limit.primary, showResetTime: showUsageResetTime)
                         }
                         if limit.secondary != nil {
-                            UsageBar(title: "\(limit.displayName) week", snapshot: limit.secondary)
+                            UsageBar(title: "\(limit.displayName) week", snapshot: limit.secondary, showResetTime: showUsageResetTime)
                         }
                     }
                 }

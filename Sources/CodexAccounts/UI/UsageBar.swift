@@ -3,6 +3,7 @@ import SwiftUI
 struct UsageBar: View {
     let title: String
     let snapshot: WindowSnapshot?
+    let showResetTime: Bool
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -17,7 +18,7 @@ struct UsageBar: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .frame(width: 90, alignment: .trailing)
+                    .frame(width: metaWidth, alignment: .trailing)
             }
         }
     }
@@ -26,11 +27,17 @@ struct UsageBar: View {
         guard let snapshot else { return "--%" }
         let percent = "\(Int(snapshot.remainingPercent.rounded()))%"
         guard let reset = snapshot.resetAt else { return percent }
-        return "\(percent) · \(formatTimeUntil(reset, now: now))"
+        let relative = formatTimeUntil(reset, now: now)
+        guard showResetTime else { return "\(percent) · \(relative)" }
+        return "\(percent) · \(relative) · \(formatResetTime(reset, now: now))"
     }
 
     private var titleWidth: CGFloat {
         title.count > 4 ? 82 : 36
+    }
+
+    private var metaWidth: CGFloat {
+        showResetTime ? 168 : 90
     }
 }
 
@@ -60,4 +67,23 @@ func formatTimeUntil(_ date: Date, now: Date = .now) -> String {
     if days > 0 { return "\(days)d \(hours)h" }
     if hours > 0 { return "\(hours)h \(String(format: "%02d", minutes))m" }
     return "\(minutes)m"
+}
+
+func formatResetTime(_ date: Date, now: Date = .now) -> String {
+    let calendar = Calendar.current
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+
+    if calendar.isDateInToday(date) {
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    if calendar.isDateInTomorrow(date) {
+        formatter.dateFormat = "HH:mm"
+        return "明天 \(formatter.string(from: date))"
+    }
+
+    formatter.dateFormat = "M/d HH:mm"
+    return formatter.string(from: date)
 }

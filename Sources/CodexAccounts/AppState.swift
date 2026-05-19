@@ -5,6 +5,7 @@ import SwiftUI
 final class AppState: ObservableObject {
     private static let hideAccountEmailKey = "hideAccountEmail"
     private static let showSparkUsageKey = "showSparkUsage"
+    private static let showUsageResetTimeKey = "showUsageResetTime"
     private static let shareCodexDataKey = "shareCodexData"
     private static let shareCodexConfigKey = "shareCodexConfig"
     private static let disableAutoTakeoverKey = "disableAutoTakeover"
@@ -23,6 +24,7 @@ final class AppState: ObservableObject {
     @Published var confirmingTerminateRunningCodex = false
     @Published var hideAccountEmail: Bool
     @Published var showSparkUsage: Bool
+    @Published var showUsageResetTime: Bool
     @Published var shareCodexData: Bool
     @Published var shareCodexDataBusy = false
     @Published var shareCodexConfig: Bool
@@ -55,6 +57,7 @@ final class AppState: ObservableObject {
          sharedData: SharedCodexData? = nil) {
         self.hideAccountEmail = UserDefaults.standard.bool(forKey: Self.hideAccountEmailKey)
         self.showSparkUsage = UserDefaults.standard.object(forKey: Self.showSparkUsageKey) as? Bool ?? true
+        self.showUsageResetTime = UserDefaults.standard.bool(forKey: Self.showUsageResetTimeKey)
         self.shareCodexData = UserDefaults.standard.bool(forKey: Self.shareCodexDataKey)
         self.shareCodexConfig = UserDefaults.standard.bool(forKey: Self.shareCodexConfigKey)
         self.launchAtLogin = LaunchAtLogin.isEnabled
@@ -120,6 +123,11 @@ final class AppState: ObservableObject {
     func setShowSparkUsage(_ enabled: Bool) {
         showSparkUsage = enabled
         UserDefaults.standard.set(enabled, forKey: Self.showSparkUsageKey)
+    }
+
+    func setShowUsageResetTime(_ enabled: Bool) {
+        showUsageResetTime = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.showUsageResetTimeKey)
     }
 
     func setShareCodexData(_ enabled: Bool) {
