@@ -11,41 +11,26 @@ struct UsageBar: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            HStack(spacing: 8) {
+            HStack(spacing: UsageBarLayout.columnSpacing) {
                 Text(title)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
-                    .frame(width: titleWidth, alignment: .leading)
+                    .lineLimit(1)
+                    .frame(width: UsageBarLayout.titleWidth, alignment: .leading)
                 BarView(
                     percent: snapshot?.remainingPercent ?? 0,
                     baselinePercent: baselinePercent
                 )
                     .frame(height: 5)
                     .help(baselineHelp)
-                Text(metaLabel(now: context.date))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(width: metaWidth, alignment: .trailing)
+                UsageMetaView(
+                    snapshot: snapshot,
+                    now: context.date,
+                    showResetTime: showResetTime,
+                    language: language
+                )
             }
         }
-    }
-
-    private func metaLabel(now: Date) -> String {
-        guard let snapshot else { return "--%" }
-        let percent = "\(Int(snapshot.remainingPercent.rounded()))%"
-        guard let reset = snapshot.resetAt else { return percent }
-        let relative = formatTimeUntil(reset, now: now)
-        guard showResetTime else { return "\(percent) · \(relative)" }
-        return "\(percent) · \(relative) · \(formatResetTime(reset, now: now, language: language))"
-    }
-
-    private var titleWidth: CGFloat {
-        title.count > 4 ? 82 : 36
-    }
-
-    private var metaWidth: CGFloat {
-        showResetTime ? 168 : 90
     }
 
     private var baselinePercent: Double? {
@@ -61,6 +46,54 @@ struct UsageBar: View {
             formatPercent(usedToday),
             formatPercent(baseline.remainingPercent)
         )
+    }
+}
+
+private struct UsageMetaView: View {
+    let snapshot: WindowSnapshot?
+    let now: Date
+    let showResetTime: Bool
+    let language: AppLanguage
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(percentText)
+                .frame(width: UsageBarLayout.percentWidth, alignment: .trailing)
+            if snapshot?.resetAt != nil {
+                Text("·")
+                Text(relativeText)
+                    .frame(width: UsageBarLayout.relativeWidth, alignment: .leading)
+                if showResetTime {
+                    Text("·")
+                    Text(resetText)
+                        .frame(width: UsageBarLayout.resetWidth, alignment: .leading)
+                }
+            }
+        }
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(width: metaWidth, alignment: .leading)
+    }
+
+    private var percentText: String {
+        guard let snapshot else { return "--%" }
+        return "\(Int(snapshot.remainingPercent.rounded()))%"
+    }
+
+    private var relativeText: String {
+        guard let reset = snapshot?.resetAt else { return "" }
+        return formatTimeUntil(reset, now: now)
+    }
+
+    private var resetText: String {
+        guard let reset = snapshot?.resetAt else { return "" }
+        return formatResetTime(reset, now: now, language: language)
+    }
+
+    private var metaWidth: CGFloat {
+        showResetTime ? UsageBarLayout.resetMetaWidth : UsageBarLayout.compactMetaWidth
     }
 }
 
@@ -116,6 +149,16 @@ private struct BaselineMarker: View {
 
 private func formatPercent(_ value: Double) -> String {
     "\(Int(value.rounded()))%"
+}
+
+private enum UsageBarLayout {
+    static let titleWidth: CGFloat = 78
+    static let columnSpacing: CGFloat = 5
+    static let percentWidth: CGFloat = 38
+    static let relativeWidth: CGFloat = 50
+    static let resetWidth: CGFloat = 66
+    static let compactMetaWidth: CGFloat = 100
+    static let resetMetaWidth: CGFloat = 174
 }
 
 func formatTimeUntil(_ date: Date, now: Date = .now) -> String {

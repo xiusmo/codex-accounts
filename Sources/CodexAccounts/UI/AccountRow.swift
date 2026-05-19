@@ -64,16 +64,15 @@ struct AccountRow: View {
                         .layoutPriority(3)
                     planBadge
                     statusBadge
-                    if account.isActive {
-                        smallBadge(l10n.text(.current))
-                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, 22)
 
                 contentForState
             }
             .layoutPriority(1)
-
+        }
+        .overlay(alignment: .topTrailing) {
             Button {
                 confirmingRemove = true
             } label: {
