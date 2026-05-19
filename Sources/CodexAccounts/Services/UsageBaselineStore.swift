@@ -16,14 +16,10 @@ enum UsageBaselineMetricKey {
     }
 
     static func snapshots(from state: UsageState) -> [(key: String, snapshot: WindowSnapshot)] {
-        guard case let .loaded(_, primary, secondary, additional) = state else { return [] }
+        guard case let .loaded(_, _, secondary, additional) = state else { return [] }
         var result: [(String, WindowSnapshot)] = []
-        if let primary { result.append((Self.primary, primary)) }
         if let secondary { result.append((Self.secondary, secondary)) }
         for (index, limit) in additional.enumerated() {
-            if let primary = limit.primary {
-                result.append((Self.additional(index: index, limit: limit, window: .primary), primary))
-            }
             if let secondary = limit.secondary {
                 result.append((Self.additional(index: index, limit: limit, window: .secondary), secondary))
             }

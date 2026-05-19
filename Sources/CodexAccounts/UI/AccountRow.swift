@@ -164,37 +164,21 @@ struct AccountRow: View {
     private var contentForState: some View {
         switch state {
         case .idle, .loading:
-            VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: nil, baseline: nil, showResetTime: showUsageResetTime, language: language)
-                UsageBar(title: l10n.text(.week), snapshot: nil, baseline: nil, showResetTime: showUsageResetTime, language: language)
-            }
+            UsageRows(
+                rows: [
+                    UsageMetricRow(id: "primary", title: "5h", snapshot: nil, baseline: nil),
+                    UsageMetricRow(id: "secondary", title: l10n.text(.week), snapshot: nil, baseline: nil)
+                ],
+                showResetTime: showUsageResetTime,
+                language: language
+            )
         case .loaded(_, let primary, let secondary, let additional):
-            VStack(spacing: 6) {
-                UsageBar(title: "5h", snapshot: primary, baseline: baseline(for: UsageBaselineMetricKey.primary), showResetTime: showUsageResetTime, language: language)
-                UsageBar(title: l10n.text(.week), snapshot: secondary, baseline: baseline(for: UsageBaselineMetricKey.secondary), showResetTime: showUsageResetTime, language: language)
-                if showSparkUsage {
-                    ForEach(sparkLimits(from: additional), id: \.offset) { index, limit in
-                        if limit.primary != nil {
-                            UsageBar(
-                                title: "\(limit.displayName) 5h",
-                                snapshot: limit.primary,
-                                baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .primary)),
-                                showResetTime: showUsageResetTime,
-                                language: language
-                            )
-                        }
-                        if limit.secondary != nil {
-                            UsageBar(
-                                title: "\(limit.displayName) \(l10n.text(.week))",
-                                snapshot: limit.secondary,
-                                baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .secondary)),
-                                showResetTime: showUsageResetTime,
-                                language: language
-                            )
-                        }
-                    }
-                }
-            }
+            let sparkLimits = showSparkUsage ? sparkLimits(from: additional) : []
+            UsageRows(
+                rows: usageRows(primary: primary, secondary: secondary, sparkLimits: sparkLimits),
+                showResetTime: showUsageResetTime,
+                language: language
+            )
         case .tokenExpired(let raw):
             compactStatusLine(raw ?? l10n.text(.expired))
         case .authInvalid(let raw):
@@ -222,6 +206,47 @@ struct AccountRow: View {
         Array(additional.enumerated()).filter { _, limit in
             limit.isSparkLimit && (limit.primary != nil || limit.secondary != nil)
         }
+    }
+
+    private func usageRows(
+        primary: WindowSnapshot?,
+        secondary: WindowSnapshot?,
+        sparkLimits: [(offset: Int, element: AdditionalUsageSnapshot)]
+    ) -> [UsageMetricRow] {
+        var rows = [
+            UsageMetricRow(id: "primary", title: "5h", snapshot: primary, baseline: nil),
+            UsageMetricRow(
+                id: "secondary",
+                title: l10n.text(.week),
+                snapshot: secondary,
+                baseline: baseline(for: UsageBaselineMetricKey.secondary)
+            )
+        ]
+
+        for (index, limit) in sparkLimits {
+            if let primary = limit.primary {
+                rows.append(
+                    UsageMetricRow(
+                        id: "spark-\(index)-primary",
+                        title: "\(limit.displayName) 5h",
+                        snapshot: primary,
+                        baseline: nil
+                    )
+                )
+            }
+            if let secondary = limit.secondary {
+                rows.append(
+                    UsageMetricRow(
+                        id: "spark-\(index)-secondary",
+                        title: "\(limit.displayName) \(l10n.text(.week))",
+                        snapshot: secondary,
+                        baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .secondary))
+                    )
+                )
+            }
+        }
+
+        return rows
     }
 
     private func baseline(for key: String) -> UsageBaselineSnapshot? {

@@ -1,45 +1,92 @@
 import SwiftUI
 
-struct UsageBar: View {
+struct UsageMetricRow: Identifiable {
+    let id: String
     let title: String
     let snapshot: WindowSnapshot?
     let baseline: UsageBaselineSnapshot?
+}
+
+struct UsageRows: View {
+    let rows: [UsageMetricRow]
+    let showResetTime: Bool
+    let language: AppLanguage
+
+    private let rowHeight: CGFloat = 16
+    private let rowSpacing: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { proxy in
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                let layout = UsageBarLayout.resolved(
+                    containerWidth: proxy.size.width,
+                    showsExtendedTitles: rows.contains { $0.title.count > 5 },
+                    showResetTime: showResetTime
+                )
+
+                VStack(spacing: rowSpacing) {
+                    ForEach(rows) { row in
+                        UsageBar(
+                            row: row,
+                            now: context.date,
+                            layout: layout,
+                            showResetTime: showResetTime,
+                            language: language
+                        )
+                        .frame(height: rowHeight)
+                    }
+                }
+            }
+        }
+        .frame(height: rowsHeight)
+    }
+
+    private var rowsHeight: CGFloat {
+        guard !rows.isEmpty else { return 0 }
+        return CGFloat(rows.count) * rowHeight + CGFloat(rows.count - 1) * rowSpacing
+    }
+}
+
+private struct UsageBar: View {
+    let row: UsageMetricRow
+    let now: Date
+    let layout: UsageBarLayout
     let showResetTime: Bool
     let language: AppLanguage
 
     private var l10n: L10n { L10n(language: language) }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            HStack(spacing: UsageBarLayout.columnSpacing) {
-                Text(title)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(width: UsageBarLayout.titleWidth, alignment: .leading)
-                BarView(
-                    percent: snapshot?.remainingPercent ?? 0,
-                    baselinePercent: baselinePercent
-                )
-                    .frame(height: 5)
-                    .help(baselineHelp)
-                UsageMetaView(
-                    snapshot: snapshot,
-                    now: context.date,
-                    showResetTime: showResetTime,
-                    language: language
-                )
-            }
+        HStack(spacing: layout.columnSpacing) {
+            Text(row.title)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: layout.titleWidth, alignment: .leading)
+            BarView(
+                percent: row.snapshot?.remainingPercent ?? 0,
+                baselinePercent: baselinePercent
+            )
+            .frame(width: layout.barWidth, height: 5)
+            .help(baselineHelp)
+            UsageMetaView(
+                snapshot: row.snapshot,
+                now: now,
+                showResetTime: showResetTime,
+                language: language,
+                layout: layout
+            )
         }
+        .frame(width: layout.totalWidth(showResetTime: showResetTime), alignment: .leading)
     }
 
     private var baselinePercent: Double? {
-        guard snapshot != nil else { return nil }
-        return baseline?.remainingPercent
+        guard row.snapshot != nil else { return nil }
+        return row.baseline?.remainingPercent
     }
 
     private var baselineHelp: String {
-        guard let snapshot, let baseline else { return "" }
+        guard let snapshot = row.snapshot, let baseline = row.baseline else { return "" }
         let usedToday = max(0, baseline.remainingPercent - snapshot.remainingPercent)
         return l10n.format(
             .dailyUsageBaselineHelpFormat,
@@ -54,19 +101,18 @@ private struct UsageMetaView: View {
     let now: Date
     let showResetTime: Bool
     let language: AppLanguage
+    let layout: UsageBarLayout
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: layout.metaSpacing) {
             Text(percentText)
-                .frame(width: UsageBarLayout.percentWidth, alignment: .trailing)
+                .frame(width: layout.percentWidth, alignment: .trailing)
             if snapshot?.resetAt != nil {
-                Text("·")
                 Text(relativeText)
-                    .frame(width: UsageBarLayout.relativeWidth, alignment: .leading)
+                    .frame(width: layout.relativeWidth, alignment: .leading)
                 if showResetTime {
-                    Text("·")
                     Text(resetText)
-                        .frame(width: UsageBarLayout.resetWidth, alignment: .leading)
+                        .frame(width: layout.resetWidth, alignment: .leading)
                 }
             }
         }
@@ -93,7 +139,7 @@ private struct UsageMetaView: View {
     }
 
     private var metaWidth: CGFloat {
-        showResetTime ? UsageBarLayout.resetMetaWidth : UsageBarLayout.compactMetaWidth
+        showResetTime ? layout.resetMetaWidth : layout.compactMetaWidth
     }
 }
 
@@ -151,14 +197,43 @@ private func formatPercent(_ value: Double) -> String {
     "\(Int(value.rounded()))%"
 }
 
-private enum UsageBarLayout {
-    static let titleWidth: CGFloat = 78
-    static let columnSpacing: CGFloat = 5
-    static let percentWidth: CGFloat = 38
-    static let relativeWidth: CGFloat = 50
-    static let resetWidth: CGFloat = 66
-    static let compactMetaWidth: CGFloat = 100
-    static let resetMetaWidth: CGFloat = 174
+struct UsageBarLayout {
+    let titleWidth: CGFloat
+    let barWidth: CGFloat
+    let columnSpacing: CGFloat = 5
+    let metaSpacing: CGFloat = 8
+    let percentWidth: CGFloat = 38
+    let relativeWidth: CGFloat = 50
+    let resetWidth: CGFloat = 66
+
+    var compactMetaWidth: CGFloat {
+        percentWidth + metaSpacing + relativeWidth
+    }
+
+    var resetMetaWidth: CGFloat {
+        percentWidth + metaSpacing + relativeWidth + metaSpacing + resetWidth
+    }
+
+    func totalWidth(showResetTime: Bool) -> CGFloat {
+        titleWidth + columnSpacing + barWidth + columnSpacing + (showResetTime ? resetMetaWidth : compactMetaWidth)
+    }
+
+    static func resolved(
+        containerWidth: CGFloat,
+        showsExtendedTitles: Bool,
+        showResetTime: Bool
+    ) -> UsageBarLayout {
+        let titleWidth: CGFloat = showsExtendedTitles ? 78 : 36
+        let reference = UsageBarLayout(titleWidth: titleWidth, barWidth: 0)
+        let metaWidth = showResetTime ? reference.resetMetaWidth : reference.compactMetaWidth
+        let spacings: CGFloat = 10
+        let minimumBarWidth: CGFloat = showsExtendedTitles ? 150 : 190
+        let availableBarWidth = containerWidth - titleWidth - metaWidth - spacings
+        return UsageBarLayout(
+            titleWidth: titleWidth,
+            barWidth: max(minimumBarWidth, availableBarWidth.rounded(.down))
+        )
+    }
 }
 
 func formatTimeUntil(_ date: Date, now: Date = .now) -> String {
