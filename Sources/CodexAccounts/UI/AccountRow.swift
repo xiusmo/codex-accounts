@@ -166,8 +166,8 @@ struct AccountRow: View {
         case .idle, .loading:
             UsageRows(
                 rows: [
-                    UsageMetricRow(id: "primary", title: "5h", snapshot: nil, baseline: nil),
-                    UsageMetricRow(id: "secondary", title: l10n.text(.week), snapshot: nil, baseline: nil)
+                    UsageMetricRow(id: "primary", title: "5h", snapshot: nil, baseline: nil, isDimmed: false),
+                    UsageMetricRow(id: "secondary", title: l10n.text(.week), snapshot: nil, baseline: nil, isDimmed: false)
                 ],
                 showResetTime: showUsageResetTime,
                 language: language
@@ -214,12 +214,19 @@ struct AccountRow: View {
         sparkLimits: [(offset: Int, element: AdditionalUsageSnapshot)]
     ) -> [UsageMetricRow] {
         var rows = [
-            UsageMetricRow(id: "primary", title: "5h", snapshot: primary, baseline: nil),
+            UsageMetricRow(
+                id: "primary",
+                title: "5h",
+                snapshot: primary,
+                baseline: nil,
+                isDimmed: isZeroWeeklyLimit(secondary)
+            ),
             UsageMetricRow(
                 id: "secondary",
                 title: l10n.text(.week),
                 snapshot: secondary,
-                baseline: baseline(for: UsageBaselineMetricKey.secondary)
+                baseline: baseline(for: UsageBaselineMetricKey.secondary),
+                isDimmed: false
             )
         ]
 
@@ -230,7 +237,8 @@ struct AccountRow: View {
                         id: "spark-\(index)-primary",
                         title: "\(limit.displayName) 5h",
                         snapshot: primary,
-                        baseline: nil
+                        baseline: nil,
+                        isDimmed: isZeroWeeklyLimit(limit.secondary)
                     )
                 )
             }
@@ -240,13 +248,19 @@ struct AccountRow: View {
                         id: "spark-\(index)-secondary",
                         title: "\(limit.displayName) \(l10n.text(.week))",
                         snapshot: secondary,
-                        baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .secondary))
+                        baseline: baseline(for: UsageBaselineMetricKey.additional(index: index, limit: limit, window: .secondary)),
+                        isDimmed: false
                     )
                 )
             }
         }
 
         return rows
+    }
+
+    private func isZeroWeeklyLimit(_ snapshot: WindowSnapshot?) -> Bool {
+        guard let snapshot else { return false }
+        return snapshot.remainingPercent <= 0.01
     }
 
     private func baseline(for key: String) -> UsageBaselineSnapshot? {

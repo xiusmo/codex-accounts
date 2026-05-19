@@ -5,6 +5,7 @@ struct UsageMetricRow: Identifiable {
     let title: String
     let snapshot: WindowSnapshot?
     let baseline: UsageBaselineSnapshot?
+    let isDimmed: Bool
 }
 
 struct UsageRows: View {
@@ -65,7 +66,8 @@ private struct UsageBar: View {
                 .frame(width: layout.titleWidth, alignment: .leading)
             BarView(
                 percent: row.snapshot?.remainingPercent ?? 0,
-                baselinePercent: baselinePercent
+                baselinePercent: baselinePercent,
+                isDimmed: row.isDimmed
             )
             .frame(width: layout.barWidth, height: 5)
             .help(baselineHelp)
@@ -146,6 +148,7 @@ private struct UsageMetaView: View {
 private struct BarView: View {
     let percent: Double
     let baselinePercent: Double?
+    let isDimmed: Bool
 
     var body: some View {
         GeometryReader { geo in
@@ -167,11 +170,19 @@ private struct BarView: View {
     private func barTrack(width: CGFloat) -> some View {
         ZStack(alignment: .leading) {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.secondary.opacity(0.18))
+                .fill(Color.secondary.opacity(trackOpacity))
             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.secondary.opacity(0.45))
+                .fill(Color.secondary.opacity(fillOpacity))
                 .frame(width: max(2, width * clamped))
         }
+    }
+
+    private var trackOpacity: Double {
+        isDimmed ? 0.10 : 0.18
+    }
+
+    private var fillOpacity: Double {
+        isDimmed ? 0.24 : 0.45
     }
 
     private func markerCenterX(width: CGFloat, percent: Double) -> CGFloat {
