@@ -76,7 +76,69 @@ final class SharedCodexDataTests: XCTestCase {
 
         try SharedCodexData(accountsBaseURL: root).enable(for: [account])
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: accountState.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: accountState.path))
         XCTAssertThrowsError(try FileManager.default.destinationOfSymbolicLink(atPath: accountState.path))
+    }
+
+    func testEnableCompletesStaleStateBackfill() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let accountHome = root.appendingPathComponent("account", isDirectory: true)
+        let stateDB = accountHome.appendingPathComponent("state_5.sqlite")
+        try FileManager.default.createDirectory(at: accountHome, withIntermediateDirectories: true)
+        try runSQLite(
+            stateDB,
+            sql: """
+            create table backfill_state (
+                id integer primary key check (id = 1),
+                status text not null,
+                last_watermark text,
+                last_success_at integer,
+                updated_at integer not null
+            );
+            insert into backfill_state values (1, 'running', 'sessions/old.jsonl', null, 1);
+            """
+        )
+
+        let account = Account(
+            directoryName: "account",
+            alias: "acct",
+            email: nil,
+            planType: nil,
+            chatgptAccountId: nil,
+            isActive: true,
+            homeDirectory: accountHome,
+            accessTokenExpired: false
+        )
+
+        try SharedCodexData(accountsBaseURL: root).enable(for: [account])
+
+        let output = try runSQLite(stateDB, sql: "select status, last_watermark from backfill_state where id = 1;")
+        XCTAssertEqual(output.trimmingCharacters(in: .whitespacesAndNewlines), "complete|")
+    }
+
+    @discardableResult
+    private func runSQLite(_ db: URL, sql: String) throws -> String {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        task.arguments = [db.path, sql]
+        let output = Pipe()
+        let error = Pipe()
+        task.standardOutput = output
+        task.standardError = error
+        try task.run()
+        task.waitUntilExit()
+        let stdout = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let stderr = String(data: error.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        if task.terminationStatus != 0 {
+            throw NSError(
+                domain: "SharedCodexDataTests.sqlite",
+                code: Int(task.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: stderr.isEmpty ? stdout : stderr]
+            )
+        }
+        return stdout
     }
 }

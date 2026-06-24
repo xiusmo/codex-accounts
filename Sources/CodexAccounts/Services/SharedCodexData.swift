@@ -8,11 +8,14 @@ import Foundation
 final class SharedCodexData {
     enum ShareError: Error, LocalizedError {
         case unsafeRelativePath(String)
+        case sqliteToolFailed(String)
 
         var errorDescription: String? {
             switch self {
             case .unsafeRelativePath(let path):
                 return "Unsafe shared CODEX_HOME path: \(path)"
+            case .sqliteToolFailed(let message):
+                return message
             }
         }
     }
@@ -32,6 +35,7 @@ final class SharedCodexData {
     private let backupRoot: URL
     private let standardCodexHome: URL
     private let fm = FileManager.default
+    private let staleBackfillSeconds: Int = 45
 
     private let dataItems: [Item] = [
         // Threads, resume metadata, goals, dynamic tools, jobs, and history.
@@ -121,6 +125,7 @@ final class SharedCodexData {
 
         for account in accounts {
             try unlinkLegacyUnsafeSharedItems(in: account.homeDirectory)
+            try repairRuntimeState(in: account.homeDirectory, accountName: account.directoryName)
             try linkSharedItems(dataItems, in: account.homeDirectory, accountName: account.directoryName)
         }
     }
@@ -202,6 +207,130 @@ final class SharedCodexData {
             guard isSymlink(linkURL, pointingTo: targetURL) else { continue }
             try fm.removeItem(at: linkURL)
         }
+    }
+
+    private func repairRuntimeState(in accountHome: URL, accountName: String) throws {
+        let stateDB = accountHome.appendingPathComponent("state_5.sqlite")
+        guard itemExists(stateDB), !isSymlink(stateDB) else {
+            try seedStateDBIfMissing(in: accountHome)
+            return
+        }
+
+        switch sqliteStateDBStatus(at: stateDB) {
+        case .complete, .unknown:
+            return
+        case .running(let updatedAt):
+            let now = Int(Date().timeIntervalSince1970)
+            guard now - updatedAt >= staleBackfillSeconds else { return }
+            try finishStaleBackfill(at: stateDB, now: now)
+        case .unhealthy:
+            try backupRuntimeStateDBs(in: accountHome, accountName: accountName)
+            try seedStateDBIfMissing(in: accountHome)
+        }
+    }
+
+    private enum StateDBStatus: Equatable {
+        case complete
+        case running(updatedAt: Int)
+        case unhealthy
+        case unknown
+    }
+
+    private func sqliteStateDBStatus(at db: URL) -> StateDBStatus {
+        guard fm.fileExists(atPath: db.path) else { return .unknown }
+        let output = (try? runSQLite(
+            db,
+            sql: "pragma integrity_check; select status, updated_at from backfill_state where id = 1;"
+        )) ?? ""
+        let lines = output
+            .split(separator: "\n")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard lines.first == "ok" else { return .unhealthy }
+        guard let stateLine = lines.dropFirst().first else { return .unknown }
+        let parts = stateLine.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard let status = parts.first else { return .unknown }
+        if status == "complete" { return .complete }
+        if status == "running" {
+            let updatedAt = parts.dropFirst().first.flatMap(Int.init) ?? 0
+            return .running(updatedAt: updatedAt)
+        }
+        return .unknown
+    }
+
+    private func finishStaleBackfill(at db: URL, now: Int) throws {
+        _ = try runSQLite(
+            db,
+            sql: """
+            update backfill_state
+            set status = 'complete',
+                last_watermark = null,
+                last_success_at = \(now),
+                updated_at = \(now)
+            where id = 1 and status = 'running';
+            """
+        )
+    }
+
+    private func seedStateDBIfMissing(in accountHome: URL) throws {
+        let target = accountHome.appendingPathComponent("state_5.sqlite")
+        guard !itemExists(target), let seed = healthyStateDBSeed(excluding: accountHome) else { return }
+        try ensureParentDirectory(for: target)
+        try fm.copyItem(at: seed, to: target)
+        try? fm.removeItem(at: accountHome.appendingPathComponent("state_5.sqlite-wal"))
+        try? fm.removeItem(at: accountHome.appendingPathComponent("state_5.sqlite-shm"))
+    }
+
+    private func healthyStateDBSeed(excluding accountHome: URL) -> URL? {
+        let candidates = [
+            standardCodexHome.appendingPathComponent("state_5.sqlite"),
+            sharedRoot.appendingPathComponent("state_5.sqlite")
+        ] + ((try? fm.contentsOfDirectory(at: baseURL, includingPropertiesForKeys: [.isDirectoryKey], options: [])) ?? [])
+            .filter { $0.standardizedFileURL.path != accountHome.standardizedFileURL.path }
+            .map { $0.appendingPathComponent("state_5.sqlite") }
+
+        return candidates.first { candidate in
+            guard itemExists(candidate), !isSymlink(candidate) else { return false }
+            return sqliteStateDBStatus(at: candidate) == .complete
+        }
+    }
+
+    private func backupRuntimeStateDBs(in accountHome: URL, accountName: String) throws {
+        for name in ["state_5.sqlite", "state_5.sqlite-wal", "state_5.sqlite-shm"] {
+            let source = accountHome.appendingPathComponent(name)
+            guard itemExists(source) else { continue }
+            try moveToBackup(source, accountName: accountName, relativePath: name)
+        }
+    }
+
+    private func runSQLite(_ db: URL, sql: String, timeout: TimeInterval = 3) throws -> String {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        task.arguments = [db.path, sql]
+        let output = Pipe()
+        let error = Pipe()
+        task.standardOutput = output
+        task.standardError = error
+
+        try task.run()
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .utility).async {
+            task.waitUntilExit()
+            group.leave()
+        }
+        if group.wait(timeout: .now() + timeout) == .timedOut {
+            task.terminate()
+            _ = group.wait(timeout: .now() + 0.5)
+            throw ShareError.sqliteToolFailed("sqlite3 timed out while checking \(db.path)")
+        }
+
+        let stdout = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let stderr = String(data: error.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard task.terminationStatus == 0 else {
+            throw ShareError.sqliteToolFailed(stderr.isEmpty ? stdout : stderr)
+        }
+        return stdout
     }
 
     private func absorbExistingItem(
