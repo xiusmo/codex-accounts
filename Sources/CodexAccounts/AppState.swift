@@ -7,6 +7,8 @@ final class AppState: ObservableObject {
     private static let showSparkUsageKey = "showSparkUsage"
     private static let showUsageResetTimeKey = "showUsageResetTime"
     private static let showDailyUsageBaselineKey = "showDailyUsageBaseline"
+    private static let lastAutomaticDailyBaselineRefreshDayKey = "lastAutomaticDailyBaselineRefreshDay"
+    private static let automaticDailyBaselineRefreshLeeway: TimeInterval = 60
     private static let shareCodexDataKey = "shareCodexData"
     private static let shareCodexConfigKey = "shareCodexConfig"
     private static let accountMoveAnimation = Animation.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.06)
@@ -48,6 +50,7 @@ final class AppState: ObservableObject {
     private var loginTask: Task<Void, Never>?
     private var shareCodexDataTask: Task<Void, Never>?
     private var shareCodexConfigTask: Task<Void, Never>?
+    private var dailyBaselineRefreshTask: Task<Void, Never>?
     private var loginGeneration = 0
     private var lastAutoTakeoverAttemptKey: String?
     private var lastUsageRefreshStartedAt: Date?
@@ -86,6 +89,7 @@ final class AppState: ObservableObject {
             if self.shareCodexConfig {
                 self.syncSharedCodexConfig(enabled: true, previous: true, rollbackOnFailure: false)
             }
+            self.startDailyBaselineRefreshSchedulerIfNeeded()
         }
     }
 
@@ -151,6 +155,12 @@ final class AppState: ObservableObject {
         showDailyUsageBaseline = enabled
         UserDefaults.standard.set(enabled, forKey: Self.showDailyUsageBaselineKey)
         dailyUsageBaselines = usageBaselineStore.today()
+        if enabled {
+            startDailyBaselineRefreshSchedulerIfNeeded()
+        } else {
+            dailyBaselineRefreshTask?.cancel()
+            dailyBaselineRefreshTask = nil
+        }
     }
 
     func setShareCodexData(_ enabled: Bool) {
@@ -331,6 +341,65 @@ final class AppState: ObservableObject {
                 lastSuccessfulUsageRefreshAt = Date()
             }
         }
+    }
+
+    private func startDailyBaselineRefreshSchedulerIfNeeded() {
+        dailyBaselineRefreshTask?.cancel()
+        dailyBaselineRefreshTask = nil
+        guard showDailyUsageBaseline else { return }
+
+        dailyBaselineRefreshTask = Task { @MainActor [weak self] in
+            await self?.refreshDailyBaselineAfterMidnightIfNeeded()
+            while !Task.isCancelled {
+                let delay = Self.secondsUntilNextLocalMidnightRefresh()
+                try? await Task.sleep(nanoseconds: Self.nanoseconds(for: delay))
+                guard !Task.isCancelled else { return }
+                await self?.refreshDailyBaselineAfterMidnightIfNeeded()
+            }
+        }
+    }
+
+    private func refreshDailyBaselineAfterMidnightIfNeeded() async {
+        guard showDailyUsageBaseline else { return }
+        let accountKeys = accounts.map(\.directoryName)
+        guard !accountKeys.isEmpty else { return }
+
+        let todayKey = usageBaselineStore.dayKey()
+        if UserDefaults.standard.string(forKey: Self.lastAutomaticDailyBaselineRefreshDayKey) == todayKey {
+            return
+        }
+
+        if usageBaselineStore.hasBaselineToday(for: accountKeys) {
+            UserDefaults.standard.set(todayKey, forKey: Self.lastAutomaticDailyBaselineRefreshDayKey)
+            return
+        }
+
+        await refreshAllUsage()
+
+        if usageBaselineStore.hasBaselineToday(for: accountKeys) {
+            UserDefaults.standard.set(todayKey, forKey: Self.lastAutomaticDailyBaselineRefreshDayKey)
+        }
+    }
+
+    static func nextLocalMidnightRefreshDate(
+        after date: Date = .now,
+        calendar: Calendar = .current
+    ) -> Date {
+        let startOfToday = calendar.startOfDay(for: date)
+        let nextMidnight = calendar.date(byAdding: .day, value: 1, to: startOfToday)
+            ?? date.addingTimeInterval(24 * 60 * 60)
+        return nextMidnight.addingTimeInterval(automaticDailyBaselineRefreshLeeway)
+    }
+
+    private static func secondsUntilNextLocalMidnightRefresh(
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> TimeInterval {
+        max(1, nextLocalMidnightRefreshDate(after: now, calendar: calendar).timeIntervalSince(now))
+    }
+
+    private static func nanoseconds(for seconds: TimeInterval) -> UInt64 {
+        UInt64(max(1, seconds) * 1_000_000_000)
     }
 
     private nonisolated static func fetchUsageRefreshingIfNeeded(

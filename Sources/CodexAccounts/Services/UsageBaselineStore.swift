@@ -53,6 +53,20 @@ final class UsageBaselineStore {
         return archive.days[dayKey(for: now, calendar: calendar)] ?? [:]
     }
 
+    func dayKey(now: Date = .now, calendar: Calendar = .current) -> String {
+        dayKey(for: now, calendar: calendar)
+    }
+
+    func hasBaselineToday(
+        for accountKeys: [String],
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard !accountKeys.isEmpty else { return false }
+        let today = today(now: now, calendar: calendar)
+        return accountKeys.allSatisfy { !(today[$0]?.isEmpty ?? true) }
+    }
+
     func recordToday(
         accountKey: String,
         state: UsageState,
