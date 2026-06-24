@@ -44,6 +44,21 @@ final class SharedCodexData {
         Item(relativePath: "state_5.sqlite", kind: .file),
         Item(relativePath: "state_5.sqlite-wal", kind: .file),
         Item(relativePath: "state_5.sqlite-shm", kind: .file),
+        Item(relativePath: "goals_1.sqlite", kind: .file),
+        Item(relativePath: "goals_1.sqlite-wal", kind: .file),
+        Item(relativePath: "goals_1.sqlite-shm", kind: .file),
+        Item(relativePath: "memories_1.sqlite", kind: .file),
+        Item(relativePath: "memories_1.sqlite-wal", kind: .file),
+        Item(relativePath: "memories_1.sqlite-shm", kind: .file),
+        Item(relativePath: "sqlite/state_5.sqlite", kind: .file),
+        Item(relativePath: "sqlite/state_5.sqlite-wal", kind: .file),
+        Item(relativePath: "sqlite/state_5.sqlite-shm", kind: .file),
+        Item(relativePath: "sqlite/goals_1.sqlite", kind: .file),
+        Item(relativePath: "sqlite/goals_1.sqlite-wal", kind: .file),
+        Item(relativePath: "sqlite/goals_1.sqlite-shm", kind: .file),
+        Item(relativePath: "sqlite/memories_1.sqlite", kind: .file),
+        Item(relativePath: "sqlite/memories_1.sqlite-wal", kind: .file),
+        Item(relativePath: "sqlite/memories_1.sqlite-shm", kind: .file),
 
         // User-visible Codex state and installed capabilities.
         Item(relativePath: "memories", kind: .directory),
@@ -55,6 +70,8 @@ final class SharedCodexData {
 
         // Account-neutral assets and caches.
         Item(relativePath: "ambient-suggestions", kind: .directory),
+        Item(relativePath: "attachments", kind: .directory),
+        Item(relativePath: "browser", kind: .directory),
         Item(relativePath: "generated_images", kind: .directory),
         Item(relativePath: "pets", kind: .directory),
         Item(relativePath: "avatars", kind: .directory),
@@ -242,10 +259,34 @@ final class SharedCodexData {
             if !itemExists(target) {
                 try ensureParentDirectory(for: target)
                 try fm.copyItem(at: source, to: target)
+            } else if relativePath.hasSuffix(".jsonl") {
+                try mergeJSONLLines(from: source, into: target)
             }
         case .directory:
             try copyDirectoryContents(from: source, to: target)
         }
+    }
+
+    private func mergeJSONLLines(from source: URL, into target: URL) throws {
+        guard let sourceText = try? String(contentsOf: source, encoding: .utf8),
+              !sourceText.isEmpty else { return }
+
+        let targetText = (try? String(contentsOf: target, encoding: .utf8)) ?? ""
+        var seen = Set(targetText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init))
+        let additions = sourceText
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+
+        guard !additions.isEmpty else { return }
+        let prefix = targetText.isEmpty || targetText.hasSuffix("\n") ? "" : "\n"
+        let payload = prefix + additions.joined(separator: "\n") + "\n"
+        guard let data = payload.data(using: .utf8) else { return }
+
+        let handle = try FileHandle(forWritingTo: target)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: data)
     }
 
     private func copyDirectoryContents(from source: URL, to target: URL) throws {

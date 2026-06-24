@@ -230,6 +230,15 @@ final class AppState: ObservableObject {
         }.value
     }
 
+    private func reapplyEnabledSharing() {
+        if shareCodexData, !shareCodexDataBusy {
+            syncSharedCodexData(enabled: true, previous: true, rollbackOnFailure: false)
+        }
+        if shareCodexConfig, !shareCodexConfigBusy {
+            syncSharedCodexConfig(enabled: true, previous: true, rollbackOnFailure: false)
+        }
+    }
+
     private func syncSharedCodexConfig(enabled: Bool, previous: Bool, rollbackOnFailure: Bool) {
         shareCodexConfigTask?.cancel()
         shareCodexConfigBusy = true
@@ -465,6 +474,7 @@ final class AppState: ObservableObject {
                     self.loginTask = nil
                     self.loginInProgress = false
                     self.accounts = loaded
+                    self.reapplyEnabledSharing()
                     self.ensureShimTakeover()
                     Task { await self.refreshAllUsage() }
                 }
@@ -513,6 +523,7 @@ final class AppState: ObservableObject {
             let name = try store.importAuth(from: candidate.sourceURL)
             try store.setActive(name)
             reload()
+            reapplyEnabledSharing()
             Task { await refreshAllUsage() }
         } catch {
             generalError = RawErrorText.string(error)
