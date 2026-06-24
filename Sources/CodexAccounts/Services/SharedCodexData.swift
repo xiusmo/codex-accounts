@@ -41,24 +41,6 @@ final class SharedCodexData {
         Item(relativePath: "history.jsonl", kind: .file),
         Item(relativePath: "transcription-history.jsonl", kind: .file),
         Item(relativePath: "shell_snapshots", kind: .directory),
-        Item(relativePath: "state_5.sqlite", kind: .file),
-        Item(relativePath: "state_5.sqlite-wal", kind: .file),
-        Item(relativePath: "state_5.sqlite-shm", kind: .file),
-        Item(relativePath: "goals_1.sqlite", kind: .file),
-        Item(relativePath: "goals_1.sqlite-wal", kind: .file),
-        Item(relativePath: "goals_1.sqlite-shm", kind: .file),
-        Item(relativePath: "memories_1.sqlite", kind: .file),
-        Item(relativePath: "memories_1.sqlite-wal", kind: .file),
-        Item(relativePath: "memories_1.sqlite-shm", kind: .file),
-        Item(relativePath: "sqlite/state_5.sqlite", kind: .file),
-        Item(relativePath: "sqlite/state_5.sqlite-wal", kind: .file),
-        Item(relativePath: "sqlite/state_5.sqlite-shm", kind: .file),
-        Item(relativePath: "sqlite/goals_1.sqlite", kind: .file),
-        Item(relativePath: "sqlite/goals_1.sqlite-wal", kind: .file),
-        Item(relativePath: "sqlite/goals_1.sqlite-shm", kind: .file),
-        Item(relativePath: "sqlite/memories_1.sqlite", kind: .file),
-        Item(relativePath: "sqlite/memories_1.sqlite-wal", kind: .file),
-        Item(relativePath: "sqlite/memories_1.sqlite-shm", kind: .file),
 
         // User-visible Codex state and installed capabilities.
         Item(relativePath: "memories", kind: .directory),
@@ -89,6 +71,29 @@ final class SharedCodexData {
         Item(relativePath: ".tmp/legacy-primary-runtime-skills", kind: .directory),
         Item(relativePath: ".tmp/app-server-remote-plugin-sync-v1", kind: .file)
     ]
+    private let legacyUnsafeDataItems: [Item] = [
+        // Live SQLite databases are process-local runtime state. Sharing them
+        // across CODEX_HOME directories can corrupt WAL-backed databases during
+        // migrations or Codex's own damage-recovery flow.
+        Item(relativePath: "state_5.sqlite", kind: .file),
+        Item(relativePath: "state_5.sqlite-wal", kind: .file),
+        Item(relativePath: "state_5.sqlite-shm", kind: .file),
+        Item(relativePath: "goals_1.sqlite", kind: .file),
+        Item(relativePath: "goals_1.sqlite-wal", kind: .file),
+        Item(relativePath: "goals_1.sqlite-shm", kind: .file),
+        Item(relativePath: "memories_1.sqlite", kind: .file),
+        Item(relativePath: "memories_1.sqlite-wal", kind: .file),
+        Item(relativePath: "memories_1.sqlite-shm", kind: .file),
+        Item(relativePath: "sqlite/state_5.sqlite", kind: .file),
+        Item(relativePath: "sqlite/state_5.sqlite-wal", kind: .file),
+        Item(relativePath: "sqlite/state_5.sqlite-shm", kind: .file),
+        Item(relativePath: "sqlite/goals_1.sqlite", kind: .file),
+        Item(relativePath: "sqlite/goals_1.sqlite-wal", kind: .file),
+        Item(relativePath: "sqlite/goals_1.sqlite-shm", kind: .file),
+        Item(relativePath: "sqlite/memories_1.sqlite", kind: .file),
+        Item(relativePath: "sqlite/memories_1.sqlite-wal", kind: .file),
+        Item(relativePath: "sqlite/memories_1.sqlite-shm", kind: .file)
+    ]
     private let configItems: [Item] = [
         Item(relativePath: "config.toml", kind: .file),
         Item(relativePath: "AGENTS.md", kind: .file),
@@ -115,6 +120,7 @@ final class SharedCodexData {
         try seedSharedItemsFromStandardHome(dataItems)
 
         for account in accounts {
+            try unlinkLegacyUnsafeSharedItems(in: account.homeDirectory)
             try linkSharedItems(dataItems, in: account.homeDirectory, accountName: account.directoryName)
         }
     }
@@ -186,6 +192,15 @@ final class SharedCodexData {
                 try fm.removeItem(at: linkURL)
             }
             try fm.createSymbolicLink(at: linkURL, withDestinationURL: targetURL)
+        }
+    }
+
+    private func unlinkLegacyUnsafeSharedItems(in accountHome: URL) throws {
+        for item in legacyUnsafeDataItems {
+            let linkURL = try url(accountHome, item.relativePath)
+            let targetURL = try url(sharedRoot, item.relativePath)
+            guard isSymlink(linkURL, pointingTo: targetURL) else { continue }
+            try fm.removeItem(at: linkURL)
         }
     }
 

@@ -43,4 +43,40 @@ final class SharedCodexDataTests: XCTestCase {
             sharedIndex.path
         )
     }
+
+    func testEnableRemovesLegacySharedSQLiteSymlink() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let sharedState = root
+            .appendingPathComponent(".shared-data", isDirectory: true)
+            .appendingPathComponent("state_5.sqlite")
+        let accountHome = root.appendingPathComponent("account", isDirectory: true)
+        let accountState = accountHome.appendingPathComponent("state_5.sqlite")
+
+        try FileManager.default.createDirectory(
+            at: sharedState.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(at: accountHome, withIntermediateDirectories: true)
+        try Data().write(to: sharedState)
+        try FileManager.default.createSymbolicLink(at: accountState, withDestinationURL: sharedState)
+
+        let account = Account(
+            directoryName: "account",
+            alias: "acct",
+            email: nil,
+            planType: nil,
+            chatgptAccountId: nil,
+            isActive: true,
+            homeDirectory: accountHome,
+            accessTokenExpired: false
+        )
+
+        try SharedCodexData(accountsBaseURL: root).enable(for: [account])
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: accountState.path))
+        XCTAssertThrowsError(try FileManager.default.destinationOfSymbolicLink(atPath: accountState.path))
+    }
 }

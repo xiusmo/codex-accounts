@@ -116,24 +116,6 @@ codex @ash resume 019e2687-3131-7611-9fe6-42492e52c32a
 - `transcription-history.jsonl`
 - `session_index.jsonl`
 - `shell_snapshots`
-- `state_5.sqlite`
-- `state_5.sqlite-wal`
-- `state_5.sqlite-shm`
-- `goals_1.sqlite`
-- `goals_1.sqlite-wal`
-- `goals_1.sqlite-shm`
-- `memories_1.sqlite`
-- `memories_1.sqlite-wal`
-- `memories_1.sqlite-shm`
-- `sqlite/state_5.sqlite`
-- `sqlite/state_5.sqlite-wal`
-- `sqlite/state_5.sqlite-shm`
-- `sqlite/goals_1.sqlite`
-- `sqlite/goals_1.sqlite-wal`
-- `sqlite/goals_1.sqlite-shm`
-- `sqlite/memories_1.sqlite`
-- `sqlite/memories_1.sqlite-wal`
-- `sqlite/memories_1.sqlite-shm`
 - `memories`
 - `automations`
 - `worktrees`
@@ -176,6 +158,11 @@ codex @ash resume 019e2687-3131-7611-9fe6-42492e52c32a
 - token
 - 环境变量
 - 日志
+- SQLite 运行态数据库
+- `state_5.sqlite`
+- `goals_1.sqlite`
+- `memories_1.sqlite`
+- `sqlite`
 - `logs_2.sqlite`
 - `sqlite/logs_2.sqlite`
 - `log`
