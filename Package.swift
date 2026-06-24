@@ -14,6 +14,10 @@ let package = Package(
             resources: [
                 .copy("Resources/shim.sh")
             ]
+        ),
+        .testTarget(
+            name: "CodexAccountsTests",
+            dependencies: ["CodexAccounts"]
         )
     ]
 )

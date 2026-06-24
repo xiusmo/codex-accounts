@@ -139,10 +139,9 @@ final class ShimInstaller {
     }
 
     private func findRealCodex(in pathString: String) -> String? {
-        let extras = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
         var seen = Set<String>()
         var ordered: [String] = []
-        for dir in pathString.split(separator: ":").map(String.init) + extras {
+        for dir in Self.pathEntries(from: pathString) {
             if dir.isEmpty { continue }
             if seen.insert(dir).inserted { ordered.append(dir) }
         }
@@ -156,7 +155,7 @@ final class ShimInstaller {
     }
 
     private func firstCodex(in pathString: String) -> URL? {
-        for dir in pathString.split(separator: ":").map(String.init) {
+        for dir in Self.pathEntries(from: pathString) {
             if dir.isEmpty { continue }
             let candidate = (dir as NSString).appendingPathComponent("codex")
             guard FileManager.default.isExecutableFile(atPath: candidate) else { continue }
@@ -184,7 +183,13 @@ final class ShimInstaller {
             }
         }
 
-        let dirs = interactivePATH.split(separator: ":").map(String.init)
+        if effectiveCodex == nil,
+           let realCodex,
+           canInterpose(at: URL(fileURLWithPath: realCodex)) {
+            return URL(fileURLWithPath: realCodex)
+        }
+
+        let dirs = Self.pathEntries(from: interactivePATH)
         let fallbackDir = fallbackShimURL.deletingLastPathComponent().path
         if let fallbackIndex = dirs.firstIndex(of: fallbackDir) {
             let realIndex = realCodex
@@ -265,28 +270,121 @@ final class ShimInstaller {
         symlinkDestination(at: url) != nil
     }
 
-    /// Spawn the user's login shell to read the PATH they actually use day-to-day.
-    /// Falls back to the process env's PATH if the shell can't be invoked.
+    /// Spawn the user's shell to read the PATH they actually use day-to-day.
+    /// GUI apps often miss PATH mutations from `.zshrc`, so collect a few
+    /// bounded sources and merge them in command-precedence order.
     private func readInteractivePATH() -> String {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let env = ProcessInfo.processInfo.environment
+        let shell = Self.executableShell(from: env["SHELL"])
+        let command = "printf '\\n\(Self.pathOutputStart)%s\(Self.pathOutputEnd)\\n' \"$PATH\""
+        let snippets = [
+            runPATHCommand(shell: shell, arguments: ["-i", "-l", "-c", command]),
+            runPATHCommand(shell: shell, arguments: ["-l", "-c", command]),
+            env["PATH"],
+            Self.defaultSearchPATH()
+        ]
+        return Self.joinedUniquePATH(snippets.compactMap { $0 })
+    }
+
+    private func runPATHCommand(shell: String, arguments: [String], timeout: TimeInterval = 2) -> String? {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: shell)
-        task.arguments = ["-l", "-c", "printf %s \"$PATH\""]
+        task.arguments = arguments
         let pipe = Pipe()
         task.standardOutput = pipe
-        task.standardError = Pipe()
+        task.standardError = FileHandle.nullDevice
+
         do {
             try task.run()
-            task.waitUntilExit()
+            let group = DispatchGroup()
+            group.enter()
+            DispatchQueue.global(qos: .utility).async {
+                task.waitUntilExit()
+                group.leave()
+            }
+            if group.wait(timeout: .now() + timeout) == .timedOut {
+                task.terminate()
+                _ = group.wait(timeout: .now() + 0.5)
+                return nil
+            }
             if task.terminationStatus == 0,
                let value = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8),
-               !value.isEmpty {
-                return value.trimmingCharacters(in: .whitespacesAndNewlines)
+               let path = Self.extractPATH(from: value) {
+                return path
             }
         } catch {
             // fall through
         }
-        return ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        return nil
+    }
+
+    private static func executableShell(from configuredShell: String?) -> String {
+        if let configuredShell,
+           FileManager.default.isExecutableFile(atPath: configuredShell) {
+            return configuredShell
+        }
+        return "/bin/zsh"
+    }
+
+    private static let pathOutputStart = "__CODEX_ACCOUNTS_PATH_BEGIN__"
+    private static let pathOutputEnd = "__CODEX_ACCOUNTS_PATH_END__"
+
+    static func extractPATH(from shellOutput: String) -> String? {
+        guard let start = shellOutput.range(of: pathOutputStart),
+              let end = shellOutput[start.upperBound...].range(of: pathOutputEnd) else {
+            let trimmed = shellOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        let value = shellOutput[start.upperBound..<end.lowerBound]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    static func joinedUniquePATH(_ pathStrings: [String], home: String = NSHomeDirectory()) -> String {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for pathString in pathStrings {
+            for entry in pathEntries(from: pathString, home: home) where seen.insert(entry).inserted {
+                ordered.append(entry)
+            }
+        }
+        return ordered.joined(separator: ":")
+    }
+
+    static func pathEntries(from pathString: String, home: String = NSHomeDirectory()) -> [String] {
+        pathString
+            .split(separator: ":")
+            .map(String.init)
+            .compactMap { normalizedPathEntry($0, home: home) }
+    }
+
+    private static func normalizedPathEntry(_ entry: String, home: String) -> String? {
+        guard !entry.isEmpty else { return nil }
+        if entry == "~" {
+            return home
+        }
+        if entry.hasPrefix("~/") {
+            return home + String(entry.dropFirst())
+        }
+        return entry
+    }
+
+    private static func defaultSearchPATH(home: String = NSHomeDirectory()) -> String {
+        [
+            "\(home)/.local/bin",
+            "\(home)/bin",
+            "\(home)/.npm-global/bin",
+            "\(home)/.volta/bin",
+            "\(home)/.asdf/shims",
+            "\(home)/.mise/shims",
+            "\(home)/.bun/bin",
+            "\(home)/.cargo/bin",
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin"
+        ].joined(separator: ":")
     }
 
     // Embedded fallback identical to Resources/shim.sh — kept in sync manually.
