@@ -9,7 +9,6 @@ final class AppState: ObservableObject {
     private static let showDailyUsageBaselineKey = "showDailyUsageBaseline"
     private static let shareCodexDataKey = "shareCodexData"
     private static let shareCodexConfigKey = "shareCodexConfig"
-    private static let disableAutoTakeoverKey = "disableAutoTakeover"
     private static let accountMoveAnimation = Animation.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.06)
     private static let usageRefreshCooldown: TimeInterval = 60
 
@@ -50,7 +49,7 @@ final class AppState: ObservableObject {
     private var shareCodexDataTask: Task<Void, Never>?
     private var shareCodexConfigTask: Task<Void, Never>?
     private var loginGeneration = 0
-    private var autoTakeoverAttempted = false
+    private var lastAutoTakeoverAttemptKey: String?
     private var lastUsageRefreshStartedAt: Date?
 
     init(store: AccountStore = AccountStore(),
@@ -113,12 +112,15 @@ final class AppState: ObservableObject {
         } catch {
             generalError = RawErrorText.string(error)
         }
-        refreshShimStatus()
-        autoTakeoverShimIfNeeded()
+        ensureShimTakeover()
     }
 
     func refreshShimStatus() {
         shimStatus = shim.currentStatus()
+    }
+
+    func ensureShimTakeover() {
+        autoTakeoverShimIfNeeded()
     }
 
     func refreshLaunchAtLoginStatus() {
@@ -463,7 +465,7 @@ final class AppState: ObservableObject {
                     self.loginTask = nil
                     self.loginInProgress = false
                     self.accounts = loaded
-                    self.refreshShimStatus()
+                    self.ensureShimTakeover()
                     Task { await self.refreshAllUsage() }
                 }
             } catch {
@@ -521,8 +523,8 @@ final class AppState: ObservableObject {
 
     func installShim(realCodex: String) {
         do {
-            UserDefaults.standard.set(false, forKey: Self.disableAutoTakeoverKey)
             try shim.install(realCodexPath: realCodex)
+            lastAutoTakeoverAttemptKey = nil
             shimError = nil
             refreshShimStatus()
         } catch {
@@ -534,7 +536,7 @@ final class AppState: ObservableObject {
     func uninstallShim() {
         do {
             try shim.uninstall()
-            UserDefaults.standard.set(true, forKey: Self.disableAutoTakeoverKey)
+            lastAutoTakeoverAttemptKey = nil
             shimError = nil
             refreshShimStatus()
         } catch {
@@ -544,17 +546,17 @@ final class AppState: ObservableObject {
     }
 
     private func autoTakeoverShimIfNeeded() {
-        guard !autoTakeoverAttempted else { return }
-        guard !UserDefaults.standard.bool(forKey: Self.disableAutoTakeoverKey) else { return }
-
         let status = shim.currentStatus()
         shimStatus = status
         guard !status.pathPrecedenceOK || status.shimNeedsUpdate else {
+            lastAutoTakeoverAttemptKey = nil
             shimError = nil
             return
         }
 
-        autoTakeoverAttempted = true
+        let attemptKey = autoTakeoverAttemptKey(for: status)
+        guard lastAutoTakeoverAttemptKey != attemptKey else { return }
+        lastAutoTakeoverAttemptKey = attemptKey
 
         do {
             guard let realCodex = status.detectedRealCodex, !realCodex.isEmpty else {
@@ -569,11 +571,32 @@ final class AppState: ObservableObject {
                     interactivePATH: refreshed.interactivePATH
                 )
             }
+            lastAutoTakeoverAttemptKey = nil
             shimError = nil
         } catch {
             shimError = RawErrorText.string(error)
             refreshShimStatus()
         }
+    }
+
+    private func autoTakeoverAttemptKey(for status: ShimInstaller.Status) -> String {
+        let installed: String = {
+            switch status.installed {
+            case .missing:
+                return "missing"
+            case .foreign:
+                return "foreign"
+            case .ours(let realCodex):
+                return "ours:\(realCodex)"
+            }
+        }()
+        return [
+            installed,
+            status.installPath,
+            status.detectedRealCodex ?? "",
+            String(status.pathPrecedenceOK),
+            String(status.shimNeedsUpdate)
+        ].joined(separator: "\u{1f}")
     }
 }
 

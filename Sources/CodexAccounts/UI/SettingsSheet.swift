@@ -20,7 +20,7 @@ struct SettingsPane: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
-            state.refreshShimStatus()
+            state.ensureShimTakeover()
             state.refreshLaunchAtLoginStatus()
             syncAliasDrafts()
         }
